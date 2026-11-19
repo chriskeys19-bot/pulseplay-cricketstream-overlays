@@ -107,8 +107,42 @@
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         expires_at: new Date().getTime() + ((data.expires_in || 3600) * 1000),
-        email: data.user && data.user.email
+        email: data.user && data.user.email,
+        user_id: data.user && data.user.id
       };
+    }
+
+    function adoptSession(session, callback) {
+      var expiresAt;
+      if (!session || !session.access_token) {
+        writeSession(null);
+        if (callback) callback(null);
+        return;
+      }
+      expiresAt = session.expires_at || 0;
+      if (expiresAt && expiresAt < 100000000000) expiresAt = expiresAt * 1000;
+      if (!expiresAt) expiresAt = new Date().getTime() + 3600 * 1000;
+      writeSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: expiresAt,
+        email: session.user && session.user.email,
+        user_id: session.user && session.user.id
+      });
+      if (callback) callback(null);
+    }
+
+    function fetchRole(callback) {
+      getSession(function (session) {
+        if (!session || !session.user_id) {
+          callback(new Error("Sign in before checking the club role."));
+          return;
+        }
+        rest("profiles?id=eq." + encodeURIComponent(session.user_id) + "&select=role", "GET", session.access_token, null, null, function (err, rows) {
+          if (err) { callback(err); return; }
+          callback(null, rows && rows[0] ? rows[0].role : "");
+        });
+      });
     }
 
     function refresh(session, callback) {
@@ -491,7 +525,9 @@
       deleteBlob: deleteBlob,
       getSession: getSession,
       signIn: signIn,
-      signOut: signOut
+      signOut: signOut,
+      adoptSession: adoptSession,
+      fetchRole: fetchRole
     };
   }
 

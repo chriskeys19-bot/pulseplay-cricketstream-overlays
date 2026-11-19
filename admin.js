@@ -1030,13 +1030,33 @@
   };
 
   function showSignIn() {
+    document.getElementById("not-admin").classList.add("is-off");
     document.getElementById("dashboard").classList.add("is-off");
     document.getElementById("sign-in").classList.remove("is-off");
   }
 
   function hideSignIn() {
     document.getElementById("sign-in").classList.add("is-off");
+    document.getElementById("not-admin").classList.add("is-off");
     document.getElementById("dashboard").classList.remove("is-off");
+  }
+
+  function showNotAdmin(email) {
+    document.getElementById("sign-in").classList.add("is-off");
+    document.getElementById("dashboard").classList.add("is-off");
+    document.getElementById("not-admin").classList.remove("is-off");
+    setText(document.getElementById("not-admin-email"), email || "");
+  }
+
+  function adminRedirectUrl() {
+    return window.location.origin + window.location.pathname;
+  }
+
+  function showSignError(message) {
+    var errEl = document.getElementById("sign-error");
+    setText(errEl, message || "");
+    if (message) errEl.classList.remove("is-off");
+    else errEl.classList.add("is-off");
   }
 
   function boot() {
@@ -1068,40 +1088,124 @@
     }, (window.PulsePlayRuntime && window.PulsePlayRuntime.pollMs) || window.PulsePlayStore.DEFAULT_POLL_MS);
   }
 
+  var authClient = null;
+  var dashboardStarted = false;
+
+  function fullSignOut(done) {
+    function clearStore() {
+      store.signOut(function () {
+        currentDoc = null;
+        dashboardStarted = false;
+        showSignIn();
+        if (done) done();
+      });
+    }
+    if (authClient && authClient.auth) {
+      authClient.auth.signOut().then(clearStore).catch(clearStore);
+      return;
+    }
+    clearStore();
+  }
+
+  function admitSession(session) {
+    if (!session || !session.access_token) {
+      showSignIn();
+      return;
+    }
+    store.adoptSession(session, function () {
+      store.fetchRole(function (err, role) {
+        var email = session.user && session.user.email;
+        if (err) {
+          showNotAdmin(email);
+          setText(document.getElementById("not-admin-email"), "Could not check your club role. Sign out and try again.");
+          return;
+        }
+        if (role !== "admin") {
+          showNotAdmin(email);
+          return;
+        }
+        showSignError("");
+        hideSignIn();
+        if (!dashboardStarted) {
+          dashboardStarted = true;
+          boot();
+        }
+      });
+    });
+  }
+
+  document.getElementById("btn-google").onclick = function () {
+    if (!authClient || !authClient.auth) {
+      showSignError("Google sign-in did not load. Use email and password, or reload the page.");
+      return;
+    }
+    showSignError("");
+    authClient.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: adminRedirectUrl() }
+    }).then(function (result) {
+      if (result && result.error) showSignError(result.error.message || "Google sign-in could not be started.");
+    }).catch(function (err) {
+      showSignError(err && err.message ? err.message : "Google sign-in could not be started.");
+    });
+  };
+
   document.getElementById("sign-in-form").onsubmit = function (event) {
     var email = document.getElementById("sign-email").value;
     var password = document.getElementById("sign-password").value;
-    var errEl = document.getElementById("sign-error");
     event.preventDefault();
+    showSignError("");
+    if (authClient && authClient.auth) {
+      authClient.auth.signInWithPassword({ email: email, password: password }).then(function (result) {
+        document.getElementById("sign-password").value = "";
+        if (result && result.error) showSignError(result.error.message || "Sign-in failed.");
+      }).catch(function (err) {
+        showSignError(err && err.message ? err.message : "Sign-in failed.");
+      });
+      return;
+    }
     store.signIn(email, password, function (err) {
-      if (err) {
-        setText(errEl, err.message || "Sign-in failed.");
-        errEl.classList.remove("is-off");
-        return;
-      }
-      errEl.classList.add("is-off");
       document.getElementById("sign-password").value = "";
-      hideSignIn();
-      boot();
+      if (err) { showSignError(err.message || "Sign-in failed."); return; }
+      store.getSession(function (session) { admitSession(session); });
     });
   };
-  document.getElementById("btn-sign-out").onclick = function () {
-    store.signOut(function () {
-      currentDoc = null;
-      showSignIn();
-    });
-  };
+  document.getElementById("btn-sign-out").onclick = function () { fullSignOut(); };
+  document.getElementById("btn-not-admin-out").onclick = function () { fullSignOut(); };
 
   if (!useSupabase) {
     hideSignIn();
     boot();
-  } else {
+  } else if (!window.supabase || !window.supabase.createClient) {
+    showSignIn();
+    showSignError("Google sign-in did not load. Email and password still work if this message is a network blip — reload to try Google again.");
     store.getSession(function (session) {
-      if (!session) showSignIn();
-      else {
-        hideSignIn();
-        boot();
+      if (session) admitSession(session);
+    });
+  } else {
+    authClient = window.supabase.createClient(window.PulsePlayRuntime.supabaseUrl, window.PulsePlayRuntime.supabaseKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: "pkce"
       }
+    });
+    authClient.auth.onAuthStateChange(function (event, session) {
+      if (event === "SIGNED_OUT") {
+        store.signOut(function () {
+          currentDoc = null;
+          dashboardStarted = false;
+          showSignIn();
+        });
+        return;
+      }
+      if (event !== "INITIAL_SESSION" && event !== "SIGNED_IN") return;
+      if (!session) {
+        showSignIn();
+        return;
+      }
+      admitSession(session);
     });
   }
 })();

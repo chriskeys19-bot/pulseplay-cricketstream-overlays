@@ -9,15 +9,23 @@
 </head>
 <body>
   <section id="sign-in" class="sign-in is-off">
+    <p class="eyebrow">Pulse Play · CricketCrazeUSA</p>
+    <h1>Club admin sign in</h1>
+    <p class="hint">Use the same Google account as the Cheetahs club app. Overlay pages stay public and do not sign in.</p>
+    <button type="button" id="btn-google" class="btn-google">Sign in with Google</button>
+    <p id="sign-error" class="banner is-off"></p>
+    <p class="or">or use email</p>
     <form id="sign-in-form" class="form">
-      <p class="eyebrow">Pulse Play · CricketCrazeUSA</p>
-      <h1>Club admin sign in</h1>
-      <p class="hint">Same email and password as the Cheetahs club app. Overlay pages stay public and do not sign in.</p>
       <label>Email <input id="sign-email" type="email" autocomplete="username" required></label>
       <label>Password <input id="sign-password" type="password" autocomplete="current-password" required></label>
-      <p id="sign-error" class="banner is-off"></p>
       <button type="submit">Sign in</button>
     </form>
+  </section>
+  <section id="not-admin" class="sign-in is-off">
+    <p class="eyebrow">Pulse Play · CricketCrazeUSA</p>
+    <h1>This Google account isn't a Pulse Play admin</h1>
+    <p id="not-admin-email" class="hint"></p>
+    <button type="button" id="btn-not-admin-out">Sign out</button>
   </section>
   <div class="wrap" id="dashboard">
     <header class="top">
@@ -184,6 +192,7 @@
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.81.1/dist/umd/supabase.js"></script>
   <script src="config/runtime.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/supabase-store.js"></script>

@@ -61,7 +61,12 @@ sequenceDiagram
 
 `config/runtime.js` chooses the adapter. `adapter` is `"supabase"` now that the migration is applied on cheetahs-club. Add `?adapter=mock` to any page URL (admin or renderer) to use the local example config instead. The publishable key in that file is public client config.
 
-The Supabase adapter (`js/supabase-store.js`) talks to the existing project `cheetahs-club` (`https://lutcbvzunjcosncvdyke.supabase.co`) with `fetch`, and falls back to `XMLHttpRequest` if `fetch` is missing. It does not load supabase-js. Renderers stay logged out and only GET. The admin signs in with the club email and password; writes send that access token. Realtime is enabled on `pp_grounds` and the adapter opens a socket when `WebSocket` exists. The poll still runs, so a missed socket message still lands within about 2 seconds.
+The Supabase adapter (`js/supabase-store.js`) talks to the existing project `cheetahs-club` (`https://lutcbvzunjcosncvdyke.supabase.co`) with `fetch`, and falls back to `XMLHttpRequest` if `fetch` is missing. Renderers stay logged out and only GET. They do not load supabase-js. The admin page loads the supabase-js UMD build so it can offer **Sign in with Google**, with email and password underneath. Google returns to this `admin.html` URL with the query and hash removed. After either sign-in, the page reads `profiles.role` and, if it is not `admin`, shows “This Google account isn't a Pulse Play admin” and a sign-out button. Writes send the admin access token. Realtime is enabled on `pp_grounds` and the adapter opens a socket when `WebSocket` exists. The poll still runs, so a missed socket message still lands within about 2 seconds.
+
+Supabase only redirects back to URLs on the Auth allowlist. The public settings API does not list that allowlist, and `/authorize` accepts any `redirect_to` (it checks later). The club app itself only sends people to `https://cheetahs-club.pages.dev/auth/callback`. Add these if they are not already there, or Google sign-in lands on the club Site URL instead of this dashboard:
+
+- `https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/admin.html`
+- `https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/**`
 
 The migration is `supabase/migrations/20261119180000_pulseplay_init.sql`. It has been applied on cheetahs-club. It creates only new objects:
 
