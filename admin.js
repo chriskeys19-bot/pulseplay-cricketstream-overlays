@@ -261,7 +261,7 @@
     var i;
     var ground;
     clear(select);
-    if (includeNew) select.appendChild(option("__new__", "New ground"));
+    if (includeNew) select.appendChild(option("__new__", "+ New ground"));
     for (i = 0; i < currentDoc.grounds.length; i++) {
       ground = currentDoc.grounds[i];
       select.appendChild(option(ground.id, ground.name + " (" + (ground.device === "mini" ? "Mini" : "Pro") + ")"));
@@ -640,18 +640,84 @@
     });
   }
 
-  function renderSetupList() {
-    var select = document.getElementById("setup-select");
-    var sig = groundIds().join("|");
-    if (sig === setupSig) return;
-    setupSig = sig;
-    fillGroundSelect(select, true);
-    if ((!select.value || select.value === "__new__") && currentId) select.value = currentId;
-    if (!select.value && currentDoc.grounds[0]) select.value = currentDoc.grounds[0].id;
-    loadSetupForm();
+  function setupSignature() {
+    var parts = ["grounds"];
+    var i;
+    var asset;
+    var ids = groundIds();
+    for (i = 0; i < ids.length; i++) parts.push(ids[i]);
+    parts.push("assets");
+    for (i = 0; i < currentDoc.assets.length; i++) {
+      asset = currentDoc.assets[i];
+      parts.push(asset.kind + ":" + asset.id + ":" + asset.label + ":" + (asset.logo_type || ""));
+    }
+    return parts.join("|");
   }
 
-  function loadSetupForm() {
+  function selectHas(select, value) {
+    var i;
+    for (i = 0; i < select.options.length; i++) {
+      if (select.options[i].value === value) return true;
+    }
+    return false;
+  }
+
+  function readSetupDraft() {
+    var select = document.getElementById("setup-select");
+    if (!select.options.length) return null;
+    return {
+      selection: select.value,
+      name: document.getElementById("field-name").value,
+      id: document.getElementById("field-id").value,
+      idTouched: idTouched,
+      shortLink: document.getElementById("field-short").value,
+      device: document.getElementById("field-device").value,
+      score: document.getElementById("field-score").value,
+      age: document.getElementById("pick-age").value,
+      tournament: document.getElementById("pick-tournament").value,
+      ccusa: document.getElementById("pick-ccusa").value,
+      ads: checkedAdIds()
+    };
+  }
+
+  function applySetupDraft(draft) {
+    var nodes;
+    var i;
+    document.getElementById("field-name").value = draft.name;
+    document.getElementById("field-id").value = draft.id;
+    idTouched = draft.idTouched;
+    document.getElementById("field-short").value = draft.shortLink;
+    document.getElementById("field-device").value = draft.device;
+    document.getElementById("field-score").value = draft.score;
+    if (selectHas(document.getElementById("pick-age"), draft.age)) document.getElementById("pick-age").value = draft.age;
+    if (selectHas(document.getElementById("pick-tournament"), draft.tournament)) document.getElementById("pick-tournament").value = draft.tournament;
+    if (selectHas(document.getElementById("pick-ccusa"), draft.ccusa)) document.getElementById("pick-ccusa").value = draft.ccusa;
+    nodes = document.getElementById("ad-checks").getElementsByTagName("input");
+    for (i = 0; i < nodes.length; i++) nodes[i].checked = indexOf(draft.ads, nodes[i].value) !== -1;
+    previewPickedLogo("pick-age", "preview-age");
+    previewPickedLogo("pick-tournament", "preview-tournament");
+    previewPickedLogo("pick-ccusa", "preview-ccusa");
+  }
+
+  function renderSetupList() {
+    var select = document.getElementById("setup-select");
+    var sig = setupSignature();
+    var draft;
+    var sameSelection;
+    if (!currentDoc) return;
+    if (sig === setupSig) return;
+    draft = readSetupDraft();
+    setupSig = sig;
+    fillGroundSelect(select, true);
+    if (!currentDoc.grounds.length) select.value = "__new__";
+    else if (draft && draft.selection && selectHas(select, draft.selection)) select.value = draft.selection;
+    else if (currentId && selectHas(select, currentId)) select.value = currentId;
+    else if (currentDoc.grounds[0]) select.value = currentDoc.grounds[0].id;
+    sameSelection = !!(draft && draft.selection === select.value);
+    loadSetupForm(sameSelection ? draft : null);
+  }
+
+  function loadSetupForm(draft) {
     var select = document.getElementById("setup-select");
     var id = select.value;
     var ground = id === "__new__" ? null : findGround(currentDoc, id);
@@ -667,6 +733,7 @@
       cricketcraze: "logo-cricketcraze"
     };
     idTouched = false;
+    if (!draft || typeof draft.selection !== "string") draft = null;
     clear(checks);
     for (i = 0; i < ads.length; i++) {
       ad = ads[i];
@@ -703,24 +770,32 @@
     previewPickedLogo("pick-tournament", "preview-tournament");
     previewPickedLogo("pick-ccusa", "preview-ccusa");
     if (!ground) {
-      document.getElementById("field-name").value = "";
-      document.getElementById("field-id").value = "";
       document.getElementById("field-id").readOnly = false;
-      document.getElementById("field-short").value = "";
-      document.getElementById("field-device").value = "pro";
-      document.getElementById("field-score").value = "";
-      setText(document.getElementById("field-resolved"), "Resolved URL is filled in when you save.");
       document.getElementById("btn-delete-ground").classList.add("is-off");
+      if (!draft) {
+        document.getElementById("field-name").value = "";
+        document.getElementById("field-id").value = "";
+        document.getElementById("field-short").value = "";
+        document.getElementById("field-device").value = "pro";
+        document.getElementById("field-score").value = "";
+        setText(document.getElementById("field-resolved"), "Resolved URL is filled in when you save.");
+      } else {
+        applySetupDraft(draft);
+      }
       return;
     }
-    document.getElementById("field-name").value = ground.name;
-    document.getElementById("field-id").value = ground.id;
     document.getElementById("field-id").readOnly = true;
-    document.getElementById("field-short").value = ground.short_link;
-    document.getElementById("field-device").value = ground.device;
-    document.getElementById("field-score").value = ground.score_url;
-    setText(document.getElementById("field-resolved"), "Resolves to " + ground.resolved_url);
     document.getElementById("btn-delete-ground").classList.remove("is-off");
+    if (!draft) {
+      document.getElementById("field-name").value = ground.name;
+      document.getElementById("field-id").value = ground.id;
+      document.getElementById("field-short").value = ground.short_link;
+      document.getElementById("field-device").value = ground.device;
+      document.getElementById("field-score").value = ground.score_url;
+      setText(document.getElementById("field-resolved"), "Resolves to " + ground.resolved_url);
+    } else {
+      applySetupDraft(draft);
+    }
   }
 
   function fillLogoSelect(selectId, preferred, selectedId) {
@@ -885,7 +960,7 @@
       librarySig = "";
       logoSig = "";
       actionSig = "";
-      setupSig = "";
+      setupSig = null;
       saveDoc("Deleted " + asset.label + ".");
     });
   }
@@ -945,7 +1020,7 @@
       }
     }
     currentId = ground.id;
-    setupSig = "";
+    setupSig = null;
     centerSig = "";
     actionSig = "";
     controlsSig = "";
@@ -970,7 +1045,7 @@
     }
     currentDoc.grounds = next;
     if (currentId === id) currentId = next[0].id;
-    setupSig = "";
+    setupSig = null;
     centerSig = "";
     actionSig = "";
     controlsSig = "";
@@ -1010,7 +1085,7 @@
       document.getElementById("ad-auto").checked = true;
       document.getElementById("ad-warn").classList.add("is-off");
       librarySig = "";
-      setupSig = "";
+      setupSig = null;
       saveDoc("Added " + label + " to the library. Assign it to a ground before it can go on air.");
     });
   }
@@ -1123,7 +1198,7 @@
       }));
       clearLogoForm();
       logoSig = "";
-      setupSig = "";
+      setupSig = null;
       saveDoc("Added " + label + " to the logo library. Pick it on a ground to put it on air.");
     });
   }
@@ -1201,7 +1276,7 @@
       centerSig = "";
       librarySig = "";
       logoSig = "";
-      setupSig = "";
+      setupSig = null;
       controlsSig = "";
       showBanner("");
       renderAll();
