@@ -1,6 +1,7 @@
 /*
  * Dumb renderer for one ground. Reads config, toggles view classes, preloads
- * that ground's ads. The only write is the auto-return to View 1 when a video ends.
+ * that ground's ads. When a video finishes, it always returns to View 1 and
+ * asks the store to save that. Image ads stay until someone switches.
  * Open with ?ground=<id>&device=pro|mini
  */
 (function () {
@@ -12,6 +13,8 @@
   var stills = {};
   var currentDoc = null;
   var soundUnlocked = false;
+  var returnHold = null;
+  var returnTimer = null;
   var pollMs = window.PulsePlayStore.DEFAULT_POLL_MS;
   var pollTimer = null;
   var polling = false;
@@ -218,8 +221,51 @@
     showSoundChip(false);
   }
 
-  function shouldReturn(doc, ad) {
-    return !!(doc && doc.auto_return_on_end !== false && ad && ad.auto_return !== false);
+  function timeMs(value) {
+    var n = Date.parse(value || "");
+    return isNaN(n) ? 0 : n;
+  }
+
+  /*
+   * A poll can still say "playing this video" for a moment after it ended.
+   * Keep View 1 until the saved row is no longer that play. A newer command
+   * (different ad, or the same ad with a new updated_at) wins.
+   */
+  function noteReturn(ground) {
+    var samePlay;
+    if (!returnHold || !ground || ground.id !== returnHold.groundId) return;
+    samePlay = ground.active_ad === returnHold.adId && timeMs(ground.updated_at) === timeMs(returnHold.seenAt);
+    if (ground.mode === "ad" && samePlay) {
+      ground.mode = "logos_score";
+      ground.active_ad = null;
+      return;
+    }
+    if (ground.mode === "logos_score" && !ground.active_ad && timeMs(ground.updated_at) === timeMs(returnHold.seenAt)) return;
+    returnHold = null;
+  }
+
+  function scheduleReturn() {
+    if (returnTimer) return;
+    returnTimer = window.setTimeout(function () {
+      returnTimer = null;
+      persistReturn();
+    }, 2000);
+  }
+
+  function persistReturn() {
+    var hold = returnHold;
+    if (!hold) return;
+    if (store.returnToLogos) {
+      store.returnToLogos(hold.groundId, hold.adId, hold.seenAt, function (err) {
+        if (returnHold !== hold) return;
+        if (err) scheduleReturn();
+      });
+      return;
+    }
+    store.write(currentDoc, function (err) {
+      if (returnHold !== hold) return;
+      if (err) scheduleReturn();
+    });
   }
 
   function onEnded(adId) {
@@ -229,14 +275,14 @@
     ad = findAd(currentDoc, adId);
     ground = findGround(currentDoc);
     if (!ground || ground.mode !== "ad" || ground.active_ad !== adId) return;
-    if (!shouldReturn(currentDoc, ad)) return;
-    ground.mode = "logos_score";
-    ground.active_ad = null;
-    ground.updated_at = new Date().toISOString();
-    store.write(currentDoc, function (err) {
-      if (err) return;
-      apply(currentDoc);
-    });
+    if (isImageAd(ad)) return;
+    returnHold = {
+      groundId: ground.id,
+      adId: adId,
+      seenAt: ground.updated_at
+    };
+    apply(currentDoc);
+    persistReturn();
   }
 
   function isImageAd(ad) {
@@ -436,6 +482,7 @@
       return;
     }
     hideStatus();
+    noteReturn(ground);
     logos = ground.logos || {};
     setLogo("logo-age", assetSrc(doc, logos.age_group_sponsor));
     setLogo("logo-tournament", assetSrc(doc, logos.tournament));

@@ -16,7 +16,7 @@
     },
     "auto_return_on_end": {
       "type": "boolean",
-      "description": "Master switch. When true, an ad with auto_return true returns to Logos + Score at the end of the file."
+      "description": "Kept for older documents. The renderer ignores it. Every video returns to Logos + Score when it finishes."
     },
     "assets": {
       "type": "array",
@@ -62,7 +62,7 @@
             { "type": "string", "enum": ["video", "image"] },
             { "type": "null" }
           ],
-          "description": "Ads only. image stays on screen until switched. video can auto-return."
+          "description": "Ads only. image stays on screen until switched. video always returns to Logos + Score when it finishes."
         },
         "created_at": { "type": "string", "format": "date-time" }
       }

@@ -3,8 +3,9 @@
  * is missing). No supabase-js. Renderers poll; a Realtime socket is optional
  * and never required for a switch to land.
  *
- * Reads use the publishable key (anon). Writes use the club admin's access
- * token from email/password sign-in. The migration is not applied by this repo.
+ * Reads use the publishable key (anon). Admin writes use the club admin's
+ * access token. The one anon write is returnToLogos, which only sets a
+ * finished video back to Logos + Score.
  */
 (function (global) {
   var SESSION_KEY = "pulseplay.supabaseSession";
@@ -358,6 +359,17 @@
       });
     }
 
+    function returnToLogos(groundId, adId, seenAt, callback) {
+      rest("rpc/pulseplay_return_to_logos", "POST", key, {
+        p_ground_id: groundId,
+        p_ad_id: adId,
+        p_seen_at: seenAt
+      }, null, function (err, changed) {
+        if (err) { callback(err); return; }
+        callback(null, changed === true);
+      });
+    }
+
     function upsert(table, rows, token, callback) {
       if (!rows.length) { callback(null); return; }
       rest(table + "?on_conflict=id", "POST", token, rows, "resolution=merge-duplicates,return=minimal", callback);
@@ -539,6 +551,7 @@
     return {
       read: read,
       write: write,
+      returnToLogos: returnToLogos,
       reset: reset,
       subscribe: subscribe,
       mediaUrl: mediaUrl,
