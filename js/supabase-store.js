@@ -211,6 +211,7 @@
           logo_type: row.logo_type,
           auto_return: row.auto_return,
           media_type: row.kind === "ad" ? (row.media_type === "image" ? "image" : "video") : null,
+          logo_scale: row.kind === "logo" && row.logo_scale != null ? Number(row.logo_scale) : null,
           created_at: row.created_at
         });
       }
@@ -231,6 +232,7 @@
             cricketcraze: row.logo_cricketcraze_id || ""
           },
           ad_ids: [],
+          layout: row.layout || null,
           updated_at: row.updated_at
         };
         byGround[ground.id] = ground;
@@ -309,6 +311,7 @@
             logo_type: asset.logo_type || null,
             media_type: asset.kind === "ad" ? (asset.media_type === "image" ? "image" : "video") : null,
             auto_return: asset.kind === "ad" && asset.media_type !== "image" ? asset.auto_return !== false : null,
+            logo_scale: asset.kind === "logo" && asset.logo_scale != null ? asset.logo_scale : null,
             created_at: asset.created_at
           });
         }
@@ -327,6 +330,7 @@
             logo_cricketcraze_id: emptyToNull(ground.logos && ground.logos.cricketcraze),
             mode: ground.mode || "logos_score",
             active_ad_id: emptyToNull(ground.active_ad),
+            layout: ground.layout || null,
             updated_at: ground.updated_at
           });
           for (j = 0; j < (ground.ad_ids || []).length; j++) {

@@ -64,7 +64,22 @@
           ],
           "description": "Ads only. image stays on screen until switched. video always returns to Logos + Score when it finishes."
         },
+        "logo_scale": {
+          "type": ["number", "null"],
+          "minimum": 0.25,
+          "maximum": 2,
+          "description": "Logos only. Multiplies the ground slot scale. Null is 100%."
+        },
         "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scale": { "type": "number", "minimum": 0.25, "maximum": 2 },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
       }
     },
     "logos": {
@@ -132,6 +147,17 @@
           "description": "CricClubs overlay URL for this ground. The renderer and Command Center both iframe this field."
         },
         "logos": { "$ref": "#/definitions/logos" },
+        "layout": {
+          "type": ["object", "null"],
+          "description": "Optional per-slot scale (0.25 to 2) and x/y nudge in stage pixels. Null uses the device base sizes.",
+          "additionalProperties": false,
+          "properties": {
+            "age": { "$ref": "#/definitions/slot" },
+            "tournament": { "$ref": "#/definitions/slot" },
+            "cricketcraze": { "$ref": "#/definitions/slot" },
+            "score": { "$ref": "#/definitions/slot" }
+          }
+        },
         "ad_ids": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
