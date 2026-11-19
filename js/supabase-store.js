@@ -361,21 +361,39 @@
       rest(table + "?on_conflict=id", "POST", token, rows, "resolution=merge-duplicates,return=minimal", callback);
     }
 
+    function quoteFilterValue(value) {
+      return "\"" + String(value).replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";
+    }
+
+    function quotedList(ids) {
+      var parts = [];
+      var i;
+      for (i = 0; i < ids.length; i++) parts.push(encodeURIComponent(quoteFilterValue(ids[i])));
+      return parts.join(",");
+    }
+
     function replaceLinks(links, groundIds, token, callback) {
-      var filter = groundIds.length ? ("?ground_id=in.(" + groundIds.join(",") + ")") : "";
-      rest("pp_ground_ads" + filter, "DELETE", token, null, "return=minimal", function (err) {
-        if (err) { callback(err); return; }
+      function postLinks() {
         if (!links.length) { callback(null); return; }
         rest("pp_ground_ads", "POST", token, links, "return=minimal", callback);
+      }
+      /* No grounds means there are no junction rows to replace. An unfiltered
+         DELETE is rejected by PostgREST ("DELETE requires a WHERE clause"). */
+      if (!groundIds.length) {
+        postLinks();
+        return;
+      }
+      rest("pp_ground_ads?ground_id=in.(" + quotedList(groundIds) + ")", "DELETE", token, null, "return=minimal", function (err) {
+        if (err) { callback(err); return; }
+        postLinks();
       });
     }
 
     function removeMissing(table, ids, token, callback) {
-      if (!ids.length) {
-        rest(table + "?id=not.is.null", "DELETE", token, null, "return=minimal", callback);
-        return;
-      }
-      rest(table + "?id=not.in.(" + ids.join(",") + ")", "DELETE", token, null, "return=minimal", callback);
+      var filter = !ids.length
+        ? "?id=not.is.null"
+        : "?id=not.in.(" + quotedList(ids) + ")";
+      rest(table + filter, "DELETE", token, null, "return=minimal", callback);
     }
 
     function subscribe(listener) {
@@ -442,8 +460,8 @@
         var folder = (file.type || "").indexOf("video/") === 0 ? "ads" : "logos";
         var path = folder + "/" + id + extOf(file);
         if (err) { callback(err); return; }
-        if (file.size > 200 * 1024 * 1024) {
-          callback(new Error("File is over the 200 MB bucket limit."));
+        if (file.size > 50 * 1024 * 1024) {
+          callback(new Error("This file is over 50 MB. The Supabase free plan rejects it. Compress it under 50 MB."));
           return;
         }
         request("/storage/v1/object/" + BUCKET + "/" + path, {

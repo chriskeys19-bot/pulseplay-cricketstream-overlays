@@ -20,7 +20,7 @@
   var STORAGE_KEY = "pulseplay.overlayConfig.v3";
   var DB_NAME = "pulseplay.overlay";
   var DB_STORE = "blobs";
-  var WARN_BYTES = 12 * 1024 * 1024;
+  var WARN_BYTES = 50 * 1024 * 1024;
   var MAX_BYTES = 80 * 1024 * 1024;
   var BLOCK_HOSTS = ["cricclubs.com", "www.cricclubs.com"];
   var blobUrls = {};

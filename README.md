@@ -128,7 +128,7 @@ Later, a small proxy or Supabase Edge Function can fetch the score server-side a
 
 ### Ad Library and ground setup
 
-**Ad Library** uploads an MP4 with a name and description, lists every ad with a preview, and can delete one. The file must be an MP4. Over 12 MB you get a warning and a confirm. The mock store refuses anything over 80 MB. The Supabase bucket allows 200 MB per object. Uploaded ads show up in Ground setup's checklist. Deleting an ad pulls it off every ground.
+**Ad Library** uploads an MP4 with a name and description, lists every ad with a preview, and can delete one. The file must be an MP4. On the live Supabase adapter, anything over 50 MB is refused because the free plan rejects it. With `?adapter=mock`, a file over 50 MB asks before it is saved in this browser. Uploaded ads show up in Ground setup's checklist. Deleting an ad pulls it off every ground.
 
 **Logo Library** is the same pattern for images: name, description, type (Age Group Sponsor, Tournament, CricketCrazeUSA, or Other), preview, list, delete.
 

@@ -56,9 +56,14 @@
       name.lastIndexOf(".svg") === name.length - 4;
   }
 
-  function uploadLimit() {
-    if (useSupabase) return 200 * 1024 * 1024;
-    return window.PulsePlayStore.MAX_BYTES;
+  var FREE_PLAN_BYTES = 50 * 1024 * 1024;
+
+  function adOverFreePlan(file) {
+    return file.size > FREE_PLAN_BYTES;
+  }
+
+  function adFreePlanError(file) {
+    return "This file is " + mb(file.size) + ". The Supabase free plan rejects uploads over 50 MB. Compress it under 50 MB.";
   }
 
   function assetFromUpload(id, kind, label, description, info, file, extra) {
@@ -894,12 +899,16 @@
     if (!label) { showBanner("Give the ad a label."); return; }
     if (!file) { showBanner("Choose an MP4."); return; }
     if (!isMp4(file)) { showBanner("That file is not an MP4."); return; }
-    if (file.size > uploadLimit()) {
-      showBanner("That MP4 is " + mb(file.size) + ", over the " + mb(uploadLimit()) + " limit.");
+    if (useSupabase && adOverFreePlan(file)) {
+      showBanner(adFreePlanError(file));
       return;
     }
-    if (file.size > window.PulsePlayStore.WARN_BYTES) {
-      if (!window.confirm("This file is " + mb(file.size) + ". A YoloBox has to download every assigned ad. Save it anyway?")) return;
+    if (!useSupabase && file.size > window.PulsePlayStore.MAX_BYTES) {
+      showBanner("That MP4 is " + mb(file.size) + ", over the " + mb(window.PulsePlayStore.MAX_BYTES) + " limit for this browser.");
+      return;
+    }
+    if (!useSupabase && adOverFreePlan(file)) {
+      if (!window.confirm("This file is " + mb(file.size) + ". Each YoloBox preloads its assigned ads over the ground's internet. Save it anyway?")) return;
     }
     id = "upload-" + new Date().getTime();
     store.putBlob(id, file, function (err, info) {
@@ -985,8 +994,10 @@
       warn.classList.remove("is-off");
       return;
     }
-    if (file.size > window.PulsePlayStore.WARN_BYTES) {
-      setText(warn, "This file is " + mb(file.size) + ". It can be saved here, but prefer a short compressed MP4 so the YoloBox is not downloading a large file for every ad.");
+    if (adOverFreePlan(file)) {
+      setText(warn, useSupabase
+        ? adFreePlanError(file)
+        : "This file is " + mb(file.size) + ". Each YoloBox preloads its assigned ads over the ground's internet.");
       warn.classList.remove("is-off");
       return;
     }
@@ -1172,6 +1183,12 @@
   };
   document.getElementById("btn-sign-out").onclick = function () { fullSignOut(); };
   document.getElementById("btn-not-admin-out").onclick = function () { fullSignOut(); };
+
+  (function applyLibraryCopy() {
+    if (useSupabase) return;
+    setText(document.getElementById("ad-library-intro"), "Upload an MP4 (sound is allowed). It becomes selectable in Ground setup. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
+    setText(document.getElementById("logo-library-intro"), "Upload a PNG, WebP, or SVG (transparency is kept). Tag it, then pick it on a ground. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
+  })();
 
   if (!useSupabase) {
     hideSignIn();
