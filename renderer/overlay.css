@@ -48,7 +48,7 @@ body.mode-ad #view-ad { opacity: 1; }
   border: 0;
   background: transparent;
   color-scheme: normal;
-  transform: scale(2.25);
+  transform: scale(2.15);
   transform-origin: bottom center;
 }
 #score-fallback {
