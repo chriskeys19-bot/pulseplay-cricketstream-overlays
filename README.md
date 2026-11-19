@@ -22,7 +22,7 @@ flowchart LR
   mock[Mock: JSON plus localStorage and IndexedDB]
   future[Supabase table, Storage, Realtime]
   pro[Pro renderer 1920x1080]
-  mini[Mini renderer 1280x720]
+  mini[Mini renderer 1920x1080]
   shortLink[One short link per ground]
   pages[GitHub Pages]
 
@@ -59,11 +59,11 @@ sequenceDiagram
 | Ads and logos | One `assets` list, `kind` `ad` or `logo`. Repo files, plus IndexedDB blobs for uploads (`src` starts with `idb:`) | One public Storage bucket `pulseplay-assets` and `pp_assets.kind` |
 | Poll | Renderer re-reads every `poll_ms` (default 2000) in case a push is missed | Same poll, plain `fetch`, no supabase-js on the YoloBox |
 
-`config/runtime.js` chooses the adapter. `adapter` is `"mock"` until the SQL below has been applied. Then set it to `"supabase"`. The publishable key in that file is public client config.
+`config/runtime.js` chooses the adapter. `adapter` is `"supabase"` now that the migration is applied on cheetahs-club. Add `?adapter=mock` to any page URL (admin or renderer) to use the local example config instead. The publishable key in that file is public client config.
 
 The Supabase adapter (`js/supabase-store.js`) talks to the existing project `cheetahs-club` (`https://lutcbvzunjcosncvdyke.supabase.co`) with `fetch`, and falls back to `XMLHttpRequest` if `fetch` is missing. It does not load supabase-js. Renderers stay logged out and only GET. The admin signs in with the club email and password; writes send that access token. Realtime is enabled on `pp_grounds` and the adapter opens a socket when `WebSocket` exists. The poll still runs, so a missed socket message still lands within about 2 seconds.
 
-The migration is `supabase/migrations/20261119180000_pulseplay_init.sql`. It is not applied in this pull request. It creates only new objects:
+The migration is `supabase/migrations/20261119180000_pulseplay_init.sql`. It has been applied on cheetahs-club. It creates only new objects:
 
 - `pp_settings` (one row: poll interval and the auto-return master switch)
 - `pp_assets` (`kind` `ad` or `logo`, label, description, storage path, mime, size, logo type, auto-return)
@@ -73,7 +73,7 @@ The migration is `supabase/migrations/20261119180000_pulseplay_init.sql`. It is 
 - Storage bucket `pulseplay-assets`, public read, 200 MB per object, MP4 / PNG / WebP / SVG. Writes require the same admin check. The bucket shares the project's 1 GB Storage free tier with the club app.
 - Adds `pp_grounds` to the `supabase_realtime` publication.
 
-It does not alter club tables, policies, or functions.
+It does not alter club tables, policies, or functions. With only the `pp_settings` row present, the libraries explain that they are empty and a renderer opened for an unknown ground stays transparent.
 
 Mock reads still fetch the JSON file with `?t=<timestamp>` so the browser does not cache the seed. After the first successful read, `localStorage` wins. **Reset mock store** clears `localStorage` and IndexedDB and loads the example file again. Supabase mode has no reset; an admin deletes rows from the dashboard.
 
@@ -137,8 +137,8 @@ This repo therefore uses an explicit stage and scales that stage to the viewport
 
 | Device | Stage | Why |
 | --- | --- | --- |
-| Pro | 1920×1080 | Full-HD program. Set the overlay widget to 1920×1080 when that is the canvas. |
-| Mini | 1280×720 | The size often recommended for YoloBox web overlays, with larger logos and a larger score bug so they read on the smaller panel. If a Mini show is a 1920×1080 widget, say so and the Mini CSS can move to that stage. |
+| Pro | 1920×1080 | Full-HD program. Set the overlay widget to 1920×1080. |
+| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. |
 
 Percentage-free pixel placement inside the stage keeps the corners stable. `renderer/overlay.js` scales the stage with `transform` so a widget that is not exactly that size letterboxes instead of cropping.
 
@@ -182,11 +182,11 @@ Example, home ground:
 python3 -m http.server 8080
 ```
 
-From the repo root:
+From the repo root the pages talk to Supabase, which starts empty. To exercise the example grounds locally, add `adapter=mock`:
 
-- Admin: <http://localhost:8080/admin.html>
-- Pro, Cheetahs home: <http://localhost:8080/renderer/pro.html?ground=cheetahs-home&device=pro>
-- Mini, Cheetahs home: <http://localhost:8080/renderer/mini.html?ground=cheetahs-home-mini&device=mini>
+- Admin: <http://localhost:8080/admin.html?adapter=mock>
+- Pro, Cheetahs home: <http://localhost:8080/renderer/pro.html?ground=cheetahs-home&device=pro&adapter=mock>
+- Mini, Cheetahs home: <http://localhost:8080/renderer/mini.html?ground=cheetahs-home-mini&device=mini&adapter=mock>
 
 Open the admin and the Pro overlay in two tabs of the same browser. On Ground controls, choose Cheetahs CC — Home (Pro). It should offer Logos + Score, Ad 1, and Ad 2 only. Click **Ad 1**. The overlay crossfades to the video without reloading, and the score iframe keeps its address. **Logos + Score** fades back. Leave an ad playing and it should return to View 1 when the file ends.
 
@@ -244,10 +244,9 @@ assets/ads/ad1.mp4 … ad4.mp4
 
 ## Roadmap
 
-1. **Apply the migration**, then set `adapter` to `"supabase"` in `config/runtime.js`. Confirm a club admin can sign in and a logged-out renderer can read.
-2. **Confirm the Mini widget size** on a device. The 1280×720 stage is the documented assumption above.
-3. **Real logos and commercials**, and a CricClubs overlay URL per ground. If those URLs refuse iframes, add a score proxy.
-4. **On-device test** of transparent background, autoplay with sound, and Realtime versus the 2 second poll.
+1. **Sign in once** as a club admin and add the real grounds, logos, and ads. Until then the libraries are empty and an unknown ground stays a transparent page.
+2. **Real logos and commercials**, and a CricClubs overlay URL per ground. If those URLs refuse iframes, add a score proxy.
+3. **On-device test** of transparent background, autoplay with sound, and Realtime versus the 2 second poll.
 
 ## Assumptions
 
