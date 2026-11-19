@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Pulse Play overlay control</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <section id="sign-in" class="sign-in is-off">
+    <form id="sign-in-form" class="form">
+      <p class="eyebrow">Pulse Play · CricketCrazeUSA</p>
+      <h1>Club admin sign in</h1>
+      <p class="hint">Same email and password as the Cheetahs club app. Overlay pages stay public and do not sign in.</p>
+      <label>Email <input id="sign-email" type="email" autocomplete="username" required></label>
+      <label>Password <input id="sign-password" type="password" autocomplete="current-password" required></label>
+      <p id="sign-error" class="banner is-off"></p>
+      <button type="submit">Sign in</button>
+    </form>
+  </section>
+  <div class="wrap" id="dashboard">
+    <header class="top">
+      <p class="eyebrow">Pulse Play · CricketCrazeUSA</p>
+      <h1>YoloBox overlay control</h1>
+    </header>
+
+    <nav class="tabs" aria-label="Dashboard">
+      <button type="button" id="tab-controls" class="tab is-active">Ground controls</button>
+      <button type="button" id="tab-center" class="tab">Command Center</button>
+      <button type="button" id="tab-library" class="tab">Ad Library</button>
+      <button type="button" id="tab-logos" class="tab">Logo Library</button>
+      <button type="button" id="tab-setup" class="tab">Ground setup</button>
+      <button type="button" id="btn-sign-out" class="btn-text is-off">Sign out</button>
+    </nav>
+
+    <p id="banner" class="banner is-off" role="status"></p>
+
+    <section id="panel-controls">
+      <div class="status">
+        <div class="status__item">
+          <p class="k">Ground</p>
+          <p class="v" id="st-name">Loading…</p>
+        </div>
+        <div class="status__item">
+          <p class="k">Device</p>
+          <p class="v" id="st-device">—</p>
+        </div>
+        <div class="status__item">
+          <p class="k">Short link</p>
+          <p class="v"><a id="st-short" href="#" target="_blank" rel="noopener">—</a></p>
+        </div>
+        <div class="status__item status__item--wide">
+          <p class="k">Resolves to</p>
+          <p class="v"><a id="st-resolved" href="#" target="_blank" rel="noopener">—</a></p>
+        </div>
+        <div class="status__item">
+          <p class="k">Active on overlay</p>
+          <p class="v" id="st-active">—</p>
+        </div>
+        <div class="status__item status__item--wide">
+          <p class="k">CricClubs overlay URL</p>
+          <p class="v"><a id="st-score" href="#" target="_blank" rel="noopener">—</a></p>
+        </div>
+      </div>
+
+      <div class="selectors">
+        <label>Ground
+          <select id="ground-select"></select>
+        </label>
+        <label>Poll interval (seconds)
+          <input id="poll-seconds" type="number" min="1" max="30" step="1" value="2">
+        </label>
+      </div>
+
+      <p class="hint"><a id="local-overlay" href="renderer/pro.html" target="_blank" rel="noopener">Open overlay</a></p>
+      <div id="action-bar" class="actions" aria-label="Overlay actions"></div>
+      <p class="hint" id="save-hint">View changes write immediately. The overlay applies them on the storage event, or on the next poll if that event is missed.</p>
+      <p class="hint"><button type="button" id="btn-reset" class="btn-text">Reset mock store to example config</button></p>
+    </section>
+
+    <section id="panel-center" class="is-off" aria-label="Command Center">
+      <div class="center-head">
+        <h2>Command Center</h2>
+        <p>One card per ground. The score strip iframes that ground's CricClubs overlay URL, the same <code>score_url</code> the renderer uses. Cards in an ad are highlighted. Click a card for its controls.</p>
+      </div>
+      <div id="card-grid" class="card-grid"></div>
+    </section>
+
+    <section id="panel-library" class="is-off" aria-label="Ad Library">
+      <div class="center-head">
+        <h2>Ad Library</h2>
+        <p>Upload an MP4 (sound is allowed). It becomes selectable in Ground setup. Files stay in this browser's IndexedDB until a Supabase Storage bucket exists, so a YoloBox will not see them yet.</p>
+      </div>
+      <label class="check"><input type="checkbox" id="global-auto" checked> Auto-return to Logos + Score when an ad ends</label>
+      <form id="ad-form" class="form">
+        <label>Label <input id="ad-label" type="text" required></label>
+        <label>Description <input id="ad-description" type="text"></label>
+        <label class="check"><input type="checkbox" id="ad-auto" checked> This ad returns to View 1 when it ends</label>
+        <label>MP4 <input id="ad-file" type="file" accept="video/mp4,.mp4" required></label>
+        <p id="ad-warn" class="note is-off"></p>
+        <button type="submit">Add to library</button>
+      </form>
+      <div id="ad-list" class="ad-list"></div>
+    </section>
+
+    <section id="panel-logos" class="is-off" aria-label="Logo Library">
+      <div class="center-head">
+        <h2>Logo Library</h2>
+        <p>Upload a PNG, WebP, or SVG (transparency is kept). Tag it, then pick it on a ground. Uploads stay in this browser until the Supabase bucket is in use.</p>
+      </div>
+      <form id="logo-form" class="form">
+        <label>Name <input id="logo-label" type="text" required></label>
+        <label>Description <input id="logo-description" type="text"></label>
+        <label>Type
+          <select id="logo-type">
+            <option value="age_group_sponsor">Age Group Sponsor</option>
+            <option value="tournament">Tournament</option>
+            <option value="cricketcraze">CricketCrazeUSA</option>
+            <option value="other" selected>Other</option>
+          </select>
+        </label>
+        <label>File <input id="logo-file" type="file" accept="image/png,image/webp,image/svg+xml,.png,.webp,.svg" required></label>
+        <p id="logo-warn" class="note is-off"></p>
+        <button type="submit">Add to library</button>
+      </form>
+      <div id="logo-list" class="ad-list"></div>
+    </section>
+
+    <section id="panel-setup" class="is-off" aria-label="Ground setup">
+      <div class="center-head">
+        <h2>Ground setup</h2>
+        <p>One short URL per ground. The renderer URL is that ground's id plus Pro or Mini. Assign only the ads this game should offer.</p>
+      </div>
+      <label>Edit
+        <select id="setup-select"></select>
+      </label>
+      <form id="ground-form" class="form">
+        <label>Ground name <input id="field-name" type="text" required></label>
+        <label>Id <input id="field-id" type="text" required pattern="[a-z0-9-]+"></label>
+        <label>Short URL <input id="field-short" type="url" required placeholder="https://short.sg/…"></label>
+        <label>Device
+          <select id="field-device">
+            <option value="pro">YoloBox Pro</option>
+            <option value="mini">YoloBox Mini</option>
+          </select>
+        </label>
+        <label>CricClubs overlay URL <input id="field-score" type="text" required></label>
+        <p class="hint" id="field-resolved"></p>
+
+        <div class="logo-fields">
+          <div>
+            <p class="k">Top left · Age group sponsor</p>
+            <img id="preview-age" class="logo-preview" alt="">
+            <select id="pick-age"></select>
+          </div>
+          <div>
+            <p class="k">Bottom left · Tournament</p>
+            <img id="preview-tournament" class="logo-preview" alt="">
+            <select id="pick-tournament"></select>
+          </div>
+          <div>
+            <p class="k">Bottom right · CricketCrazeUSA</p>
+            <img id="preview-ccusa" class="logo-preview" alt="">
+            <select id="pick-ccusa"></select>
+            <button type="button" id="btn-ccusa-default" class="btn-text">Use shared CricketCrazeUSA logo</button>
+          </div>
+        </div>
+
+        <fieldset>
+          <legend>Ads for this ground</legend>
+          <div id="ad-checks"></div>
+        </fieldset>
+
+        <button type="submit">Save ground</button>
+        <button type="button" id="btn-delete-ground" class="btn-danger">Delete ground</button>
+      </form>
+    </section>
+
+    <footer class="foot">
+      <p>Mock adapter. Config is localStorage. Uploads are IndexedDB blobs in this browser. A YoloBox will not see either until Supabase is connected.</p>
+    </footer>
+  </div>
+
+  <script src="config/runtime.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/supabase-store.js"></script>
+  <script src="js/score-frame.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
