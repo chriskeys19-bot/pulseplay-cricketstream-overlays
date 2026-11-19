@@ -139,16 +139,55 @@
     });
   }
 
-  function quiet(video) {
-    if (!video.getAttribute("data-playing") && !video.classList.contains("is-active")) return;
+  /*
+   * A paused <video> that still has a src keeps the hardware decoder.
+   * YoloBox's browser will then show the next file as a frozen frame.
+   * Drop src so only the video that is about to play holds the pipeline.
+   */
+  function parkVideo(video) {
+    var url;
+    if (!video) return;
+    video.setAttribute("data-load-gen", String((parseInt(video.getAttribute("data-load-gen"), 10) || 0) + 1));
+    url = video.getAttribute("data-resolved") || video.currentSrc || "";
+    if (url) video.setAttribute("data-resolved", url);
     video.classList.remove("is-active");
     video.muted = true;
     video.removeAttribute("data-playing");
     video.removeAttribute("data-want-play");
-    try {
-      video.pause();
-      if (video.currentTime > 0) video.currentTime = 0;
-    } catch (e) {}
+    if (!video.getAttribute("src") && !video.currentSrc) return;
+    try { video.pause(); } catch (e) {}
+    video.removeAttribute("src");
+    try { video.load(); } catch (e2) {}
+  }
+
+  function parkOthers(keep) {
+    var key;
+    for (key in videos) {
+      if (!videos.hasOwnProperty(key) || videos[key] === keep) continue;
+      parkVideo(videos[key]);
+    }
+  }
+
+  function finishArm(video) {
+    if (video) video.removeAttribute("data-arming");
+  }
+
+  function playFromStart(video) {
+    var url = video.getAttribute("data-resolved") || video.currentSrc || video.src || "";
+    if (!url) {
+      video.setAttribute("data-want-play", "1");
+      return;
+    }
+    video.setAttribute("data-resolved", url);
+    parkOthers(video);
+    video.classList.add("is-active");
+    video.setAttribute("data-arming", "1");
+    try { video.pause(); } catch (e) {}
+    video.src = url;
+    try { video.load(); } catch (e2) {}
+    video.removeAttribute("data-want-play");
+    video.setAttribute("data-playing", "1");
+    playVideo(video);
   }
 
   function showSoundChip(on) {
@@ -183,27 +222,21 @@
 
   function playMuted(video) {
     var retry;
-    if (soundUnlocked) return;
     video.muted = true;
-    showSoundChip(true);
+    if (soundUnlocked) showSoundChip(false);
+    else showSoundChip(true);
     try {
       retry = video.play();
-      if (retry && retry.catch) retry.catch(function () {});
-    } catch (e) {}
+      if (retry && retry.then) {
+        retry.then(function () { finishArm(video); }).catch(function () { finishArm(video); });
+      } else finishArm(video);
+    } catch (e) { finishArm(video); }
   }
 
   function playVideo(video) {
     var result;
-    if (soundUnlocked) {
-      video.muted = false;
-      showSoundChip(false);
-      try {
-        result = video.play();
-        if (result && result.catch) result.catch(function () {});
-      } catch (e) {}
-      return;
-    }
     video.muted = false;
+    showSoundChip(false);
     try {
       result = video.play();
     } catch (e2) {
@@ -212,13 +245,14 @@
     }
     if (result && result.then) {
       result.then(function () {
+        finishArm(video);
         showSoundChip(false);
       }).catch(function () {
         playMuted(video);
       });
       return;
     }
-    showSoundChip(false);
+    finishArm(video);
   }
 
   function timeMs(value) {
@@ -271,7 +305,10 @@
   function onEnded(adId) {
     var ad;
     var ground;
+    var node = videos[adId];
     if (!currentDoc) return;
+    if (node && node.getAttribute("data-arming") === "1") return;
+    if (node && node.duration > 1 && node.currentTime > 0 && node.currentTime < 0.5) return;
     ad = findAd(currentDoc, adId);
     ground = findGround(currentDoc);
     if (!ground || ground.mode !== "ad" || ground.active_ad !== adId) return;
@@ -315,7 +352,7 @@
       wanted[ad.id] = ad;
       image = isImageAd(ad);
       if (image && videos[ad.id]) {
-        quiet(videos[ad.id]);
+        parkVideo(videos[ad.id]);
         dropNode(videos, ad.id);
       }
       if (!image && stills[ad.id]) dropNode(stills, ad.id);
@@ -342,10 +379,23 @@
       }
       if (node.getAttribute("data-src") !== ad.src) {
         node.setAttribute("data-src", ad.src);
+        if (!node.getAttribute("data-load-gen")) node.setAttribute("data-load-gen", "0");
         (function (el, src, isImage) {
+          var gen = el.getAttribute("data-load-gen") || "0";
           store.mediaUrl(src, function (err, url) {
+            var playingOther = false;
+            var otherKey;
             if (err || !url) return;
             if (el.getAttribute("data-src") !== src) return;
+            if (!isImage) el.setAttribute("data-resolved", url);
+            if (el.getAttribute("data-load-gen") !== gen && el.getAttribute("data-want-play") !== "1") return;
+            if (!isImage) {
+              for (otherKey in videos) {
+                if (!videos.hasOwnProperty(otherKey) || videos[otherKey] === el) continue;
+                if (videos[otherKey].getAttribute("data-playing") === "1") playingOther = true;
+              }
+              if (playingOther && el.getAttribute("data-want-play") !== "1") return;
+            }
             el.src = url;
             if (!isImage) {
               try { el.load(); } catch (e) {}
@@ -360,7 +410,7 @@
     }
     for (key in videos) {
       if (!videos.hasOwnProperty(key) || wanted[key]) continue;
-      quiet(videos[key]);
+      parkVideo(videos[key]);
       dropNode(videos, key);
     }
     for (key in stills) {
@@ -420,15 +470,17 @@
     setMode("logos");
     hideStills();
     for (key in videos) {
-      if (videos.hasOwnProperty(key)) quiet(videos[key]);
+      if (videos.hasOwnProperty(key)) parkVideo(videos[key]);
     }
   }
 
   function showAd(adId) {
-    var key;
     var ad = findAd(currentDoc, adId);
     var image = isImageAd(ad);
     var node;
+    var groundNow;
+    var command;
+    var same;
     setMode("ad");
     if (image) {
       document.body.classList.add("mode-image");
@@ -436,28 +488,40 @@
     } else {
       document.body.classList.remove("mode-image");
     }
-    for (key in videos) {
-      if (!videos.hasOwnProperty(key)) continue;
-      if (!image && key === adId) continue;
-      quiet(videos[key]);
-    }
     hideStills();
     node = image ? stills[adId] : videos[adId];
-    if (!node) return;
-    node.classList.add("is-active");
     if (image) {
+      parkOthers(null);
+      if (!node) return;
+      node.classList.add("is-active");
       if (!node.getAttribute("src")) node.setAttribute("data-want-play", "1");
       else node.removeAttribute("data-want-play");
       return;
     }
-    if (node.getAttribute("data-playing") === "1") return;
-    if (!node.src) {
-      node.setAttribute("data-want-play", "1");
+    if (!node) return;
+    groundNow = findGround(currentDoc);
+    command = adId + ":" + (groundNow ? String(timeMs(groundNow.updated_at)) : "");
+    same = node.getAttribute("data-command") === command;
+    if (same && node.getAttribute("data-playing") === "1" && node.getAttribute("data-arming") !== "1" && !node.paused && !node.ended && node.readyState >= 2) {
+      node.classList.add("is-active");
+      parkOthers(node);
       return;
     }
-    node.removeAttribute("data-want-play");
-    node.setAttribute("data-playing", "1");
-    playVideo(node);
+    if (!same) node.removeAttribute("data-retried");
+    node.setAttribute("data-command", command);
+    node.classList.add("is-active");
+    playFromStart(node);
+    if (node.getAttribute("data-retried") === "1") return;
+    window.setTimeout(function () {
+      if (node.getAttribute("data-command") !== command) return;
+      if (node.getAttribute("data-retried") === "1") return;
+      if (!node.paused && !node.ended) {
+        finishArm(node);
+        return;
+      }
+      node.setAttribute("data-retried", "1");
+      playFromStart(node);
+    }, 700);
   }
 
   function schedule() {

@@ -86,7 +86,7 @@ Mock reads still fetch the JSON file with `?t=<timestamp>` so the browser does n
 
 Both views are always mounted. The body class `mode-logos-score` or `mode-ad` changes opacity over 250ms. The score iframe is hidden, not removed, and its `src` is set only when `score_url` changes.
 
-Assigned ads for the open ground are created up front as `<video preload="auto" muted>`. They stay muted until that ad is the one on screen, then the renderer unmutes and calls `play()`. Switching away pauses and rewinds them. It does not destroy the element.
+Assigned ads for the open ground are created up front as `<video preload="auto" muted>`. Choosing a video always starts that file from the first frame. Other video elements drop their `src` first, so a device that can decode only one file at a time (the YoloBox browser) cannot keep the previous commercial's decoder and freeze the new one. Switching away does not destroy the element. The URL is kept and attached again the next time that ad is selected.
 
 Expected latency, after the click:
 
@@ -143,7 +143,7 @@ This repo therefore uses an explicit stage and scales that stage to the viewport
 | Device | Stage | Why |
 | --- | --- | --- |
 | Pro | 1920×1080 | Full-HD program. Set the overlay widget to 1920×1080. |
-| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. The age-group logo is 336px on Pro and 448px on Mini, set higher on the stage. The tournament logo is 135px on Pro and 158px on Mini. CricketCrazeUSA stays 190px and 220px, shifted down so its artwork lines up with the tournament logo. The score iframe is scaled 2.15× from its bottom center and sits about 20px lower so the painted bug stays on screen. |
+| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. The age-group logo is 168px on Pro and 224px on Mini, set higher on the stage. The tournament logo is 135px on Pro and 158px on Mini. CricketCrazeUSA stays 190px and 220px, shifted down so its artwork lines up with the tournament logo. The score iframe is scaled 2.15× from its bottom center and sits about 20px lower so the painted bug stays on screen. |
 
 Percentage-free pixel placement inside the stage keeps the corners stable. `renderer/overlay.js` scales the stage with `transform` so a widget that is not exactly that size letterboxes instead of cropping.
 
