@@ -98,7 +98,7 @@
     <section id="panel-library" class="is-off" aria-label="Ad Library">
       <div class="center-head">
         <h2>Ad Library</h2>
-        <p>Upload an MP4 (sound is allowed). It becomes selectable in Ground setup. Files stay in this browser's IndexedDB until a Supabase Storage bucket exists, so a YoloBox will not see them yet.</p>
+        <p id="ad-library-intro">Upload an MP4 (sound is allowed). It's stored in Pulse Play storage and becomes selectable in Ground setup. Each YoloBox preloads the ads assigned to its ground so switching is instant, so keep ads compressed (about 20–40 MB, 1080p).</p>
       </div>
       <label class="check"><input type="checkbox" id="global-auto" checked> Auto-return to Logos + Score when an ad ends</label>
       <form id="ad-form" class="form">
@@ -115,7 +115,7 @@
     <section id="panel-logos" class="is-off" aria-label="Logo Library">
       <div class="center-head">
         <h2>Logo Library</h2>
-        <p>Upload a PNG, WebP, or SVG (transparency is kept). Tag it, then pick it on a ground. Uploads stay in this browser until the Supabase bucket is in use.</p>
+        <p id="logo-library-intro">Upload a PNG, WebP, or SVG (transparency is kept). It's stored in Pulse Play storage. Tag it, then pick it on a ground.</p>
       </div>
       <form id="logo-form" class="form">
         <label>Name <input id="logo-label" type="text" required></label>
