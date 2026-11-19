@@ -75,7 +75,7 @@ The migration is `supabase/migrations/20261119180000_pulseplay_init.sql`. It has
 - `pp_grounds` (identity plus `mode`, `active_ad_id`, `updated_at`, and the three logo asset ids)
 - `pp_ground_ads` (which ads a ground may play)
 - RLS: `anon` and `authenticated` can select. Insert, update, and delete require `private.current_role() = 'admin'`, the club helper that reads `profiles.role`. That function is not modified.
-- Storage bucket `pulseplay-assets`, public read, 200 MB per object, MP4 / PNG / WebP / SVG. Writes require the same admin check. The bucket shares the project's 1 GB Storage free tier with the club app.
+- Storage bucket `pulseplay-assets`, public read, 200 MB per object, MP4 / PNG / WebP / SVG / JPEG. Writes require the same admin check. The bucket shares the project's 1 GB Storage free tier with the club app. `20261119173233_pulseplay_jpeg_mime.sql` records the JPEG types already set on cheetahs-club.
 - Adds `pp_grounds` to the `supabase_realtime` publication.
 
 It does not alter club tables, policies, or functions. With only the `pp_settings` row present, the libraries explain that they are empty and a renderer opened for an unknown ground stays transparent.
@@ -112,7 +112,7 @@ When a video ends, the renderer writes `mode: logos_score` and `active_ad: null`
 | Bottom right | CricketCrazeUSA logo |
 | Bottom center | Iframe of that ground's `score_url` |
 
-Placeholder art is in the Logo Library (`assets/logos/`, including one SVG). Ground setup does not take a raw URL. Each corner is a picker: matching `logo_type` first, then any other logo. The shared CricketCrazeUSA asset is `logo-cricketcraze`. Uploads may be PNG, WebP, or SVG, and transparency is left as it is in the file.
+Placeholder art is in the Logo Library (`assets/logos/`, including one SVG). Ground setup does not take a raw URL. Each corner is a picker: matching `logo_type` first, then any other logo. The shared CricketCrazeUSA asset is `logo-cricketcraze`. Uploads may be PNG, WebP, SVG, or JPG. JPG has no transparency, so it sits in a solid box on the stream. A PDF is not stored: the admin converts page 1 to a PNG (about 1000px on the long edge, transparent canvas) and uploads that.
 
 **View 2**
 
@@ -130,7 +130,7 @@ Later, a small proxy or Supabase Edge Function can fetch the score server-side a
 
 **Ad Library** uploads an MP4 with a name and description, lists every ad with a preview, and can delete one. The file must be an MP4. On the live Supabase adapter, anything over 50 MB is refused because the free plan rejects it. With `?adapter=mock`, a file over 50 MB asks before it is saved in this browser. Uploaded ads show up in Ground setup's checklist. Deleting an ad pulls it off every ground.
 
-**Logo Library** is the same pattern for images: name, description, type (Age Group Sponsor, Tournament, CricketCrazeUSA, or Other), preview, list, delete.
+**Logo Library** is the same pattern for images: name, description, type (Age Group Sponsor, Tournament, CricketCrazeUSA, or Other), preview, list, delete. PNG, WebP, SVG, and JPG are stored as uploaded. JPG shows a note that it has no transparency. A PDF is rendered with pdf.js (page 1) to a PNG preview, and that PNG is what gets saved.
 
 **Ground setup** edits or adds a ground: name, id, short URL, device (YoloBox Pro or YoloBox Mini), CricClubs overlay URL, the three logo pickers, and the ads this game may play. The control view's buttons are only Logos + Score plus that ground's assigned ads. Saving recomputes `resolved_url`.
 

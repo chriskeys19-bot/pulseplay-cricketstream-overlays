@@ -180,6 +180,11 @@ input[type="number"] { width: 120px; min-width: 120px; }
   background: #07140c;
   margin-bottom: 8px;
 }
+.logo-convert-preview {
+  width: 280px;
+  height: auto;
+  max-height: 220px;
+}
 fieldset { border: 1px solid #31402d; margin: 8px 0 16px; padding: 10px 12px; }
 legend { color: #c5cebb; font-size: 13px; font-weight: 700; }
 .ad-list { margin-top: 16px; }

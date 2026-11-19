@@ -115,7 +115,7 @@
     <section id="panel-logos" class="is-off" aria-label="Logo Library">
       <div class="center-head">
         <h2>Logo Library</h2>
-        <p id="logo-library-intro">Upload a PNG, WebP, or SVG (transparency is kept). It's stored in Pulse Play storage. Tag it, then pick it on a ground.</p>
+        <p id="logo-library-intro">Upload a PNG, WebP, SVG, or JPG. A PDF is converted to a PNG of page 1 before it is saved. It's stored in Pulse Play storage. Tag it, then pick it on a ground.</p>
       </div>
       <form id="logo-form" class="form">
         <label>Name <input id="logo-label" type="text" required></label>
@@ -128,8 +128,9 @@
             <option value="other" selected>Other</option>
           </select>
         </label>
-        <label>File <input id="logo-file" type="file" accept="image/png,image/webp,image/svg+xml,.png,.webp,.svg" required></label>
+        <label>File <input id="logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,application/pdf,.png,.jpg,.jpeg,.webp,.svg,.pdf" required></label>
         <p id="logo-warn" class="note is-off"></p>
+        <img id="logo-convert-preview" class="logo-preview logo-convert-preview is-off" alt="Converted logo preview">
         <button type="submit">Add to library</button>
       </form>
       <div id="logo-list" class="ad-list"></div>
@@ -193,6 +194,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.81.1/dist/umd/supabase.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="config/runtime.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/supabase-store.js"></script>

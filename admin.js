@@ -47,13 +47,102 @@
     return type === "video/mp4" || name.lastIndexOf(".mp4") === name.length - 4;
   }
 
+  var PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  var logoConvertToken = 0;
+  var preparingLogo = false;
+  var preparedLogo = null;
+
+  function fileSuffix(name, suffix) {
+    return name.lastIndexOf(suffix) === name.length - suffix.length;
+  }
+
+  function isJpeg(file) {
+    var type = (file.type || "").toLowerCase();
+    var name = (file.name || "").toLowerCase();
+    return type === "image/jpeg" || type === "image/jpg" || fileSuffix(name, ".jpg") || fileSuffix(name, ".jpeg");
+  }
+
+  function isPdf(file) {
+    var type = (file.type || "").toLowerCase();
+    var name = (file.name || "").toLowerCase();
+    return type === "application/pdf" || fileSuffix(name, ".pdf");
+  }
+
   function isLogoFile(file) {
     var type = (file.type || "").toLowerCase();
     var name = (file.name || "").toLowerCase();
-    if (type === "image/png" || type === "image/webp" || type === "image/svg+xml") return true;
-    return name.lastIndexOf(".png") === name.length - 4 ||
-      name.lastIndexOf(".webp") === name.length - 5 ||
-      name.lastIndexOf(".svg") === name.length - 4;
+    if (type === "image/png" || type === "image/webp" || type === "image/svg+xml" || isJpeg(file) || isPdf(file)) return true;
+    return fileSuffix(name, ".png") || fileSuffix(name, ".webp") || fileSuffix(name, ".svg");
+  }
+
+  function fileKey(file) {
+    return (file.name || "") + ":" + (file.size || 0) + ":" + (file.lastModified || 0);
+  }
+
+  function jpegFile(file) {
+    var type = (file.type || "").toLowerCase();
+    var name;
+    if (type === "image/jpeg") return file;
+    name = file.name || "logo.jpg";
+    if (!fileSuffix(name.toLowerCase(), ".jpg") && !fileSuffix(name.toLowerCase(), ".jpeg")) name += ".jpg";
+    return new File([file], name, { type: "image/jpeg" });
+  }
+
+  function hideLogoPreview() {
+    var preview = document.getElementById("logo-convert-preview");
+    if (preview.getAttribute("src")) {
+      try { URL.revokeObjectURL(preview.src); } catch (e) {}
+    }
+    preview.removeAttribute("src");
+    preview.classList.add("is-off");
+  }
+
+  function showLogoPreview(file) {
+    var preview = document.getElementById("logo-convert-preview");
+    hideLogoPreview();
+    preview.src = URL.createObjectURL(file);
+    preview.classList.remove("is-off");
+  }
+
+  function pdfToPng(file, callback) {
+    var reader = new FileReader();
+    reader.onerror = function () { callback(new Error("Could not read that PDF.")); };
+    reader.onload = function () {
+      var data = new Uint8Array(reader.result);
+      var lib = window.pdfjsLib;
+      if (!lib || !lib.getDocument) {
+        callback(new Error("The PDF converter did not load. Reload the page and try again."));
+        return;
+      }
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      lib.getDocument({ data: data }).promise.then(function (pdf) {
+        return pdf.getPage(1);
+      }).then(function (page) {
+        var base = page.getViewport({ scale: 1 });
+        var longEdge = Math.max(base.width, base.height) || 1;
+        var viewport = page.getViewport({ scale: 1000 / longEdge });
+        var canvas = document.createElement("canvas");
+        var ctx;
+        canvas.width = Math.max(1, Math.round(viewport.width));
+        canvas.height = Math.max(1, Math.round(viewport.height));
+        ctx = canvas.getContext("2d");
+        return page.render({
+          canvasContext: ctx,
+          viewport: viewport,
+          background: "rgba(0,0,0,0)"
+        }).promise.then(function () { return canvas; });
+      }).then(function (canvas) {
+        canvas.toBlob(function (blob) {
+          var name;
+          if (!blob) { callback(new Error("Could not convert that PDF to a PNG.")); return; }
+          name = (file.name || "logo.pdf").replace(/\.pdf$/i, "") + ".png";
+          callback(null, new File([blob], name, { type: "image/png" }));
+        }, "image/png");
+      }).catch(function (err) {
+        callback(new Error((err && err.message) || "Could not convert that PDF."));
+      });
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   var FREE_PLAN_BYTES = 50 * 1024 * 1024;
@@ -468,7 +557,7 @@
     if (!logos.length) {
       var emptyLogos = document.createElement("p");
       emptyLogos.className = "hint";
-      setText(emptyLogos, "No logos yet. Upload a PNG, WebP, or SVG above and tag its corner. Ground setup picks from this list.");
+      setText(emptyLogos, "No logos yet. Upload a PNG, WebP, SVG, JPG, or PDF above and tag its corner. Ground setup picks from this list.");
       list.appendChild(emptyLogos);
       return;
     }
@@ -926,36 +1015,113 @@
     });
   }
 
+  function clearLogoForm() {
+    var warn = document.getElementById("logo-warn");
+    logoConvertToken += 1;
+    preparingLogo = false;
+    preparedLogo = null;
+    hideLogoPreview();
+    document.getElementById("logo-form").reset();
+    document.getElementById("logo-type").value = "other";
+    warn.classList.add("is-off");
+    setText(warn, "");
+  }
+
+  function logoToSave(file) {
+    if (isPdf(file)) {
+      if (preparingLogo) return { error: "Still converting that PDF. The preview appears when page 1 is ready." };
+      if (!preparedLogo || preparedLogo.key !== fileKey(file)) return { error: "That PDF did not convert. Choose it again." };
+      return { file: preparedLogo.file };
+    }
+    if (isJpeg(file)) return { file: jpegFile(file) };
+    return { file: file };
+  }
+
+  function onLogoFile(file) {
+    var warn = document.getElementById("logo-warn");
+    var token;
+    logoConvertToken += 1;
+    token = logoConvertToken;
+    preparingLogo = false;
+    preparedLogo = null;
+    hideLogoPreview();
+    if (!file) {
+      warn.classList.add("is-off");
+      setText(warn, "");
+      return;
+    }
+    if (!isLogoFile(file)) {
+      setText(warn, "Logos must be PNG, WebP, SVG, JPG, or PDF.");
+      warn.classList.remove("is-off");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setText(warn, "That logo is " + mb(file.size) + ", over 8 MB.");
+      warn.classList.remove("is-off");
+      return;
+    }
+    if (isPdf(file)) {
+      preparingLogo = true;
+      setText(warn, "Converting page 1 to a PNG…");
+      warn.classList.remove("is-off");
+      pdfToPng(file, function (err, pngFile) {
+        if (token !== logoConvertToken) return;
+        preparingLogo = false;
+        if (err) {
+          setText(warn, err.message || "Could not convert that PDF.");
+          return;
+        }
+        preparedLogo = { key: fileKey(file), file: pngFile };
+        showLogoPreview(pngFile);
+        setText(warn, "Page 1 converted to PNG. This preview is what will be saved.");
+      });
+      return;
+    }
+    if (isJpeg(file)) {
+      setText(warn, "JPGs have no transparency, so they show as a solid box on the stream. PNG is best." +
+        (file.size > 2 * 1024 * 1024 ? " This logo is " + mb(file.size) + ". It will still be saved, but a smaller file loads faster on the YoloBox." : ""));
+      warn.classList.remove("is-off");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setText(warn, "This logo is " + mb(file.size) + ". It will still be saved, but a smaller file loads faster on the YoloBox.");
+      warn.classList.remove("is-off");
+      return;
+    }
+    warn.classList.add("is-off");
+    setText(warn, "");
+  }
+
   function onAddLogo(event) {
     var fileInput = document.getElementById("logo-file");
     var file = fileInput.files && fileInput.files[0];
     var label = document.getElementById("logo-label").value.replace(/^\s+|\s+$/g, "");
     var description = document.getElementById("logo-description").value.replace(/^\s+|\s+$/g, "");
     var logoType = document.getElementById("logo-type").value;
-    var warn = document.getElementById("logo-warn");
+    var upload;
     var id;
     event.preventDefault();
     if (!label) { showBanner("Give the logo a name."); return; }
-    if (!file) { showBanner("Choose a PNG, WebP, or SVG."); return; }
-    if (!isLogoFile(file)) { showBanner("Logos must be PNG, WebP, or SVG."); return; }
+    if (!file) { showBanner("Choose a PNG, WebP, SVG, JPG, or PDF."); return; }
+    if (!isLogoFile(file)) { showBanner("Logos must be PNG, WebP, SVG, JPG, or PDF."); return; }
     if (file.size > 8 * 1024 * 1024) {
       showBanner("That logo is " + mb(file.size) + ", over 8 MB.");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setText(warn, "This logo is " + mb(file.size) + ". It will still be saved, but a smaller file loads faster on the YoloBox.");
-      warn.classList.remove("is-off");
+    upload = logoToSave(file);
+    if (upload.error) { showBanner(upload.error); return; }
+    if (upload.file.size > 8 * 1024 * 1024) {
+      showBanner("That logo is " + mb(upload.file.size) + ", over 8 MB.");
+      return;
     }
     id = "logo-" + new Date().getTime();
-    store.putBlob(id, file, function (err, info) {
+    store.putBlob(id, upload.file, function (err, info) {
       if (err) { showBanner(err.message || "Upload failed."); return; }
-      currentDoc.assets.push(assetFromUpload(id, "logo", label, description, info, file, {
+      currentDoc.assets.push(assetFromUpload(id, "logo", label, description, info, upload.file, {
         auto_return: null,
         logo_type: logoType
       }));
-      document.getElementById("logo-form").reset();
-      document.getElementById("logo-type").value = "other";
-      warn.classList.add("is-off");
+      clearLogoForm();
       logoSig = "";
       setupSig = "";
       saveDoc("Added " + label + " to the logo library. Pick it on a ground to put it on air.");
@@ -1020,6 +1186,9 @@
   document.getElementById("btn-ccusa-default").onclick = function () {
     document.getElementById("pick-ccusa").value = "logo-cricketcraze";
     previewPickedLogo("pick-ccusa", "preview-ccusa");
+  };
+  document.getElementById("logo-file").onchange = function () {
+    onLogoFile(this.files && this.files[0]);
   };
   document.getElementById("logo-form").onsubmit = onAddLogo;
   document.getElementById("btn-reset").onclick = function () {
@@ -1187,7 +1356,7 @@
   (function applyLibraryCopy() {
     if (useSupabase) return;
     setText(document.getElementById("ad-library-intro"), "Upload an MP4 (sound is allowed). It becomes selectable in Ground setup. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
-    setText(document.getElementById("logo-library-intro"), "Upload a PNG, WebP, or SVG (transparency is kept). Tag it, then pick it on a ground. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
+    setText(document.getElementById("logo-library-intro"), "Upload a PNG, WebP, SVG, or JPG. A PDF is converted to a PNG of page 1 in this browser. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
   })();
 
   if (!useSupabase) {
