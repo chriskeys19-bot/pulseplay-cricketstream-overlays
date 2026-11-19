@@ -197,6 +197,27 @@ legend { color: #c5cebb; font-size: 13px; font-weight: 700; }
 .ad-card p { margin: 4px 0; }
 .foot { margin-top: 22px; color: #c5cebb; font-size: 13px; }
 .sign-in { max-width: 460px; margin: 48px auto; padding: 0 20px; }
+.btn-google {
+  display: block;
+  width: 100%;
+  margin: 16px 0 8px;
+  padding: 14px 16px;
+  font-weight: 700;
+  font-size: 16px;
+  background: #f6f3ea;
+  color: #102018;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sign-in .or {
+  margin: 18px 0 8px;
+  color: #c5cebb;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .tabs .btn-text { float: right; margin-top: 8px; }
 @media (max-width: 720px) {
   .status__item, .status__item--wide, .card, .ad-card { width: 100%; margin-right: 0; }
