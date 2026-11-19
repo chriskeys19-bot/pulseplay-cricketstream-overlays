@@ -97,7 +97,7 @@ Expected latency, after the click:
 | YoloBox today | It only has the seed file. Laptop clicks do not reach it | — |
 | YoloBox with Realtime | Network round trip, aimed at under a second | 250ms |
 
-Autoplay with sound is often blocked until a user gesture. The renderer tries with sound, then retries muted if the browser rejects it. That needs a test on the YoloBox itself. YoloBox mixes browser audio with the HDMI game audio, so a spot with sound is what we want when the engine allows it.
+Autoplay with sound is often blocked until a user gesture. The renderer tries unmuted `play()` first. If the browser allows it, as a YoloBox usually does, the ad plays with sound and no prompt is shown. If the browser rejects it, the ad plays muted and a small corner chip says “Tap to enable sound.” One tap anywhere on the page unmutes the current ad, resumes it, and remembers that choice for the rest of the page load so later ads start with sound. The chip then stays hidden.
 
 When a video ends, the renderer writes `mode: logos_score` and `active_ad: null` if **both** the master switch `auto_return_on_end` and that ad's `auto_return` are true. That is the one write the renderer performs. Otherwise the last frame stays up until someone presses Logos + Score. Both switches default to on.
 

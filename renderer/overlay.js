@@ -10,6 +10,7 @@
   var groundId = queryParam("ground");
   var videos = {};
   var currentDoc = null;
+  var soundUnlocked = false;
   var pollMs = window.PulsePlayStore.DEFAULT_POLL_MS;
   var pollTimer = null;
   var polling = false;
@@ -146,19 +147,74 @@
     } catch (e) {}
   }
 
-  function playVideo(video) {
+  function showSoundChip(on) {
+    var chip = document.getElementById("sound-chip");
+    if (!chip) return;
+    if (on && !soundUnlocked) chip.classList.remove("is-off");
+    else chip.classList.add("is-off");
+  }
+
+  function activeVideo() {
+    var key;
+    for (key in videos) {
+      if (videos.hasOwnProperty(key) && videos[key].classList.contains("is-active")) return videos[key];
+    }
+    return null;
+  }
+
+  function unlockSound() {
+    var video;
     var result;
+    if (soundUnlocked) return;
+    soundUnlocked = true;
+    showSoundChip(false);
+    video = activeVideo();
+    if (!video) return;
     video.muted = false;
     try {
       result = video.play();
-      if (result && result.catch) {
-        result.catch(function () {
-          video.muted = true;
-          var retry = video.play();
-          if (retry && retry.catch) retry.catch(function () {});
-        });
-      }
+      if (result && result.catch) result.catch(function () {});
     } catch (e) {}
+  }
+
+  function playMuted(video) {
+    var retry;
+    if (soundUnlocked) return;
+    video.muted = true;
+    showSoundChip(true);
+    try {
+      retry = video.play();
+      if (retry && retry.catch) retry.catch(function () {});
+    } catch (e) {}
+  }
+
+  function playVideo(video) {
+    var result;
+    if (soundUnlocked) {
+      video.muted = false;
+      showSoundChip(false);
+      try {
+        result = video.play();
+        if (result && result.catch) result.catch(function () {});
+      } catch (e) {}
+      return;
+    }
+    video.muted = false;
+    try {
+      result = video.play();
+    } catch (e2) {
+      playMuted(video);
+      return;
+    }
+    if (result && result.then) {
+      result.then(function () {
+        showSoundChip(false);
+      }).catch(function () {
+        playMuted(video);
+      });
+      return;
+    }
+    showSoundChip(false);
   }
 
   function shouldReturn(doc, ad) {
@@ -272,6 +328,7 @@
 
   function showLogos() {
     var key;
+    showSoundChip(false);
     setMode("logos");
     for (key in videos) {
       if (videos.hasOwnProperty(key)) quiet(videos[key]);
@@ -351,6 +408,8 @@
     });
   }
 
+  document.addEventListener("click", unlockSound, true);
+  document.addEventListener("touchend", unlockSound, true);
   window.addEventListener("resize", fitStage);
   fitStage();
   store.subscribe(function (err, doc) {
