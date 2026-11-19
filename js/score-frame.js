@@ -44,6 +44,8 @@
     var settled;
 
     if (!iframe) return;
+    iframe.setAttribute("allowtransparency", "true");
+    iframe.style.backgroundColor = "transparent";
     safe = store.safeUrl(url);
 
     if (link) {

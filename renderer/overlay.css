@@ -47,6 +47,7 @@ body.mode-ad #view-ad { opacity: 1; }
   height: 100%;
   border: 0;
   background: transparent;
+  color-scheme: normal;
 }
 #score-fallback {
   margin: 0;

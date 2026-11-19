@@ -122,7 +122,7 @@ Logos and the score slot fade out. The chosen MP4 fills the stage. Placeholder s
 
 `score_url` is the CricClubs overlay URL for that ground, or a site-root path such as `scores/board.html?...` while a real overlay URL is not ready. The board is only a stand-in so the bug shows a total. Query keys: `batting`, `bowling`, `score`, `overs`, `rr`.
 
-CricClubs and many score hosts send `X-Frame-Options` or CSP `frame-ancestors`. The browser also blocks a cross-origin read, so the page cannot scrape the total. `cricclubs.com` is on a short deny-list so we do not wait on a frame that will be refused. Any other URL is still tried, and if it is blank after a few seconds the iframe is hidden and a link is shown. Command Center uses the same field and the same fallback.
+Some score hosts send `X-Frame-Options` or CSP `frame-ancestors`. The browser also blocks a cross-origin read, so the page cannot scrape the total. The deny-list is exact hosts only: `cricclubs.com` and `www.cricclubs.com`, both of which send `X-Frame-Options: SAMEORIGIN`. Subdomains are not blocked by that list. `overlay.cricclubs.com` is allowlisted; it is the CricClubs streaming overlay and sends neither header, so the score iframe loads it. The iframe is transparent so that overlay can sit on the stream. Any other URL is still tried, and if it is blank after a few seconds the iframe is hidden and a link is shown. Command Center uses the same rule and the same fallback.
 
 Later, a small proxy or Supabase Edge Function can fetch the score server-side and return a same-origin snippet, if the score site's terms allow it.
 

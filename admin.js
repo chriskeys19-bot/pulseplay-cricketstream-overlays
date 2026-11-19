@@ -425,6 +425,8 @@
     iframe.setAttribute("title", ground.name + " score");
     iframe.setAttribute("scrolling", "no");
     iframe.setAttribute("referrerpolicy", "no-referrer");
+    iframe.setAttribute("allowtransparency", "true");
+    iframe.style.backgroundColor = "transparent";
     fallback.className = "score-fallback is-off";
     setText(fallback, "This score source blocks embedding. ");
     fallback.appendChild(fallbackLink);
