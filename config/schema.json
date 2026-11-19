@@ -105,7 +105,11 @@
           "format": "uri",
           "description": "GitHub Pages URL the short link redirects to."
         },
-        "device": { "type": "string", "enum": ["pro", "mini"] },
+        "device": {
+          "type": "string",
+          "enum": ["pro", "mini"],
+          "description": "Both Pro and Mini use a 1920x1080 stage. mini.css only enlarges logos and type for the Mini's smaller panel."
+        },
         "mode": {
           "type": "string",
           "enum": ["logos_score", "ad"],

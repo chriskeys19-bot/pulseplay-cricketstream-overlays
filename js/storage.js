@@ -300,9 +300,32 @@
     };
   }
 
+  function adapterFromQuery() {
+    var search = global.location && global.location.search ? global.location.search : "";
+    var parts;
+    var i;
+    var pair;
+    var key;
+    var value;
+    if (!search) return "";
+    if (search.charAt(0) === "?") search = search.substring(1);
+    parts = search.split("&");
+    for (i = 0; i < parts.length; i++) {
+      pair = parts[i].split("=");
+      try { key = decodeURIComponent(pair[0] || ""); }
+      catch (e) { key = pair[0] || ""; }
+      if (key !== "adapter") continue;
+      try { value = decodeURIComponent((pair[1] || "").replace(/\+/g, " ")); }
+      catch (e2) { value = pair[1] || ""; }
+      if (value === "mock" || value === "supabase") return value;
+    }
+    return "";
+  }
+
   function create(options) {
     var runtime = global.PulsePlayRuntime || {};
-    var which = (options && options.adapter) || runtime.adapter || "mock";
+    var which = adapterFromQuery() || (options && options.adapter) || runtime.adapter || "mock";
+    global.PulsePlayStore.chosenAdapter = which;
     if (which === "supabase") {
       if (!global.PulsePlayStore.createSupabaseStore) {
         throw new Error("Supabase adapter is not loaded.");

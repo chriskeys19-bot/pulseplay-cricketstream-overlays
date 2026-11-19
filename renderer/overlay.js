@@ -309,13 +309,15 @@
     var logos;
     var nextPoll;
     currentDoc = doc;
-    if (!groundId) {
-      showStatus("Add ?ground=<id>&device=pro to this overlay URL.");
-      return;
-    }
     ground = findGround(doc);
-    if (!ground) {
-      showStatus("Unknown ground \"" + groundId + "\".");
+    if (!groundId || !ground) {
+      /* Empty database or a bad short link: stay transparent so the game
+         video is not covered by an error plate. */
+      hideStatus();
+      setLogo("logo-age", "");
+      setLogo("logo-tournament", "");
+      setLogo("logo-ccusa", "");
+      showLogos();
       return;
     }
     hideStatus();
@@ -341,7 +343,7 @@
     store.read(function (err, doc) {
       polling = false;
       if (err) {
-        showStatus(err.message || "Could not read overlay config.");
+        hideStatus();
         return;
       }
       apply(doc);

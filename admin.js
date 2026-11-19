@@ -4,17 +4,17 @@
  */
 (function () {
   var PAGES = "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays";
-  var useSupabase = window.PulsePlayRuntime && window.PulsePlayRuntime.adapter === "supabase";
   var store = window.PulsePlayStore.create({
     configUrl: "config/grounds.example.json"
   });
+  var useSupabase = window.PulsePlayStore.chosenAdapter === "supabase";
   var currentDoc = null;
   var currentId = "";
   var actionSig = "";
   var centerSig = "";
-  var librarySig = "";
-  var logoSig = "";
-  var setupSig = "";
+  var librarySig = null;
+  var logoSig = null;
+  var setupSig = null;
   var controlsSig = "";
   var idTouched = false;
   var polling = false;
@@ -183,8 +183,17 @@
     var pollInput = document.getElementById("poll-seconds");
     var seconds;
     if (!ground) {
-      setText(document.getElementById("st-name"), "No grounds");
-      setText(document.getElementById("st-active"), "—");
+      setText(document.getElementById("st-name"), "No grounds yet");
+      setText(document.getElementById("st-device"), "—");
+      setText(document.getElementById("st-active"), "Add the first ground in Ground setup");
+      setText(document.getElementById("st-short"), "—");
+      document.getElementById("st-short").removeAttribute("href");
+      setText(document.getElementById("st-resolved"), "—");
+      document.getElementById("st-resolved").removeAttribute("href");
+      setText(document.getElementById("st-score"), "—");
+      document.getElementById("st-score").removeAttribute("href");
+      setText(localLink, "Overlay pages stay transparent until a ground exists");
+      localLink.removeAttribute("href");
       return;
     }
     setText(document.getElementById("st-name"), ground.name);
@@ -226,6 +235,10 @@
     if (!ground) {
       clear(bar);
       actionSig = "";
+      var none = document.createElement("p");
+      none.className = "hint";
+      setText(none, "No grounds yet. Open Ground setup to add one. Until then the YoloBox pages stay blank.");
+      bar.appendChild(none);
       return;
     }
     if (sig !== actionSig) {
@@ -368,13 +381,21 @@
 
   function renderCenter() {
     var grid = document.getElementById("card-grid");
-    var sig = groundIds().join("|");
+    var sig = groundIds().join("|") || "__empty__";
     var i;
     var card;
     var ground;
+    var emptyNote;
     if (sig !== centerSig) {
       centerSig = sig;
       clear(grid);
+      if (!currentDoc.grounds.length) {
+        emptyNote = document.createElement("p");
+        emptyNote.className = "hint";
+        setText(emptyNote, "No grounds yet. Add the first one in Ground setup. Overlay pages stay transparent until a ground exists.");
+        grid.appendChild(emptyNote);
+        return;
+      }
       for (i = 0; i < currentDoc.grounds.length; i++) grid.appendChild(buildCard(currentDoc.grounds[i]));
       return;
     }
@@ -419,6 +440,13 @@
     if (sig === librarySig) return;
     librarySig = sig;
     clear(list);
+    if (!ads.length) {
+      var emptyAds = document.createElement("p");
+      emptyAds.className = "hint";
+      setText(emptyAds, "No ads yet. Upload an MP4 above. It will show up in Ground setup once it is saved.");
+      list.appendChild(emptyAds);
+      return;
+    }
     for (i = 0; i < ads.length; i++) list.appendChild(buildAdCard(ads[i]));
   }
 
@@ -432,6 +460,13 @@
     logoSig = sig;
     clear(list);
     logos = assetsOf("logo");
+    if (!logos.length) {
+      var emptyLogos = document.createElement("p");
+      emptyLogos.className = "hint";
+      setText(emptyLogos, "No logos yet. Upload a PNG, WebP, or SVG above and tag its corner. Ground setup picks from this list.");
+      list.appendChild(emptyLogos);
+      return;
+    }
     for (i = 0; i < logos.length; i++) list.appendChild(buildLogoCard(logos[i]));
   }
 
@@ -550,6 +585,22 @@
       label.appendChild(box);
       label.appendChild(document.createTextNode(" " + ad.label));
       checks.appendChild(label);
+    }
+    if (!ads.length) {
+      var noAds = document.createElement("p");
+      noAds.className = "hint";
+      setText(noAds, "No ads in the library yet. Add one on the Ad Library tab, then tick it here.");
+      checks.appendChild(noAds);
+    }
+    var logoPickEmpty = document.getElementById("logo-pick-empty");
+    if (logoPickEmpty) {
+      if (!assetsOf("logo").length) logoPickEmpty.classList.remove("is-off");
+      else logoPickEmpty.classList.add("is-off");
+    }
+    var setupEmpty = document.getElementById("setup-empty");
+    if (setupEmpty) {
+      if (!currentDoc.grounds.length) setupEmpty.classList.remove("is-off");
+      else setupEmpty.classList.add("is-off");
     }
     fillLogoSelect("pick-age", "age_group_sponsor", logos.age_group_sponsor);
     fillLogoSelect("pick-tournament", "tournament", logos.tournament);
@@ -992,6 +1043,7 @@
     if (useSupabase) {
       document.getElementById("btn-reset").classList.add("is-off");
       document.getElementById("btn-sign-out").classList.remove("is-off");
+      setText(document.querySelector(".foot p"), "Live store: Supabase project cheetahs-club. Sign in with a club admin account to add grounds, ads, and logos. Add ?adapter=mock to this URL to use the local example instead.");
     }
     store.read(function (err, doc) {
       if (err) { showBanner(err.message || "Could not read config."); return; }
