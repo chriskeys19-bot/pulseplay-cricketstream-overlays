@@ -45,7 +45,7 @@ sequenceDiagram
   Store-->>Box: push when the adapter has one
   Note over Box: CSS opacity crossfade, about 250ms
   Box->>Box: unmute and play the preloaded MP4
-  Box->>Store: on ended, if auto-return, write View 1
+  Box->>Store: on video ended, save View 1
 ```
 
 ### Storage adapter
@@ -61,7 +61,7 @@ sequenceDiagram
 
 `config/runtime.js` chooses the adapter. `adapter` is `"supabase"` now that the migration is applied on cheetahs-club. Add `?adapter=mock` to any page URL (admin or renderer) to use the local example config instead. The publishable key in that file is public client config.
 
-The Supabase adapter (`js/supabase-store.js`) talks to the existing project `cheetahs-club` (`https://lutcbvzunjcosncvdyke.supabase.co`) with `fetch`, and falls back to `XMLHttpRequest` if `fetch` is missing. Renderers stay logged out and only GET. They do not load supabase-js. The admin page loads the supabase-js UMD build so it can offer **Sign in with Google**, with email and password underneath. Google returns to this `admin.html` URL with the query and hash removed. After either sign-in, the page reads `profiles.role` and, if it is not `admin`, shows “This Google account isn't a Pulse Play admin” and a sign-out button. Writes send the admin access token. Realtime is enabled on `pp_grounds` and the adapter opens a socket when `WebSocket` exists. The poll still runs. Ground controls can set it from 2 to 300 seconds, so a missed socket message lands on the next poll rather than always within 2 seconds.
+The Supabase adapter (`js/supabase-store.js`) talks to the existing project `cheetahs-club` (`https://lutcbvzunjcosncvdyke.supabase.co`) with `fetch`, and falls back to `XMLHttpRequest` if `fetch` is missing. Renderers stay logged out. They GET the config, and when a video ends they call `pulseplay_return_to_logos`, which only sets that ground back to Logos + Score. They do not load supabase-js. The admin page loads the supabase-js UMD build so it can offer **Sign in with Google**, with email and password underneath. Google returns to this `admin.html` URL with the query and hash removed. After either sign-in, the page reads `profiles.role` and, if it is not `admin`, shows “This Google account isn't a Pulse Play admin” and a sign-out button. Writes send the admin access token. Realtime is enabled on `pp_grounds` and the adapter opens a socket when `WebSocket` exists. The poll still runs. Ground controls can set it from 2 to 300 seconds, so a missed socket message lands on the next poll rather than always within 2 seconds.
 
 Supabase only redirects back to URLs on the Auth allowlist. The public settings API does not list that allowlist, and `/authorize` accepts any `redirect_to` (it checks later). The club app itself only sends people to `https://cheetahs-club.pages.dev/auth/callback`. Add these if they are not already there, or Google sign-in lands on the club Site URL instead of this dashboard:
 
@@ -70,11 +70,11 @@ Supabase only redirects back to URLs on the Auth allowlist. The public settings 
 
 The migration is `supabase/migrations/20261119180000_pulseplay_init.sql`. It has been applied on cheetahs-club. It creates only new objects:
 
-- `pp_settings` (one row: poll interval and the auto-return master switch)
+- `pp_settings` (one row: poll interval, plus `auto_return_on_end`, which the renderer no longer reads)
 - `pp_assets` (`kind` `ad` or `logo`, label, description, storage path, mime, size, logo type, auto-return)
 - `pp_grounds` (identity plus `mode`, `active_ad_id`, `updated_at`, and the three logo asset ids)
 - `pp_ground_ads` (which ads a ground may play)
-- RLS: `anon` and `authenticated` can select. Insert, update, and delete require `private.current_role() = 'admin'`, the club helper that reads `profiles.role`. That function is not modified.
+- RLS: `anon` and `authenticated` can select. Insert, update, and delete require `private.current_role() = 'admin'`, the club helper that reads `profiles.role`. That function is not modified. `20261119233000_pulseplay_return_to_logos.sql` adds `pulseplay_return_to_logos`. Anonymous renderers may call it. It only sets `mode` to `logos_score` and clears `active_ad_id` when that ground is still on the same video.
 - Storage bucket `pulseplay-assets`, public read, 200 MB per object, MP4 / PNG / WebP / SVG / JPEG. Writes require the same admin check. The bucket shares the project's 1 GB Storage free tier with the club app. `20261119173233_pulseplay_jpeg_mime.sql` records the JPEG types already set on cheetahs-club.
 - Adds `pp_grounds` to the `supabase_realtime` publication.
 
@@ -99,7 +99,7 @@ Expected latency, after the click:
 
 Autoplay with sound is often blocked until a user gesture. The renderer tries unmuted `play()` first. If the browser allows it, as a YoloBox usually does, the ad plays with sound and no prompt is shown. If the browser rejects it, the ad plays muted and a small corner chip says “Tap to enable sound.” One tap anywhere on the page unmutes the current ad, resumes it, and remembers that choice for the rest of the page load so later ads start with sound. The chip then stays hidden.
 
-When a video ends, the renderer writes `mode: logos_score` and `active_ad: null` if **both** the master switch `auto_return_on_end` and that ad's `auto_return` are true. That is the one write the renderer performs. Otherwise the last frame stays up until someone presses Logos + Score. Both switches default to on.
+When a video ends, the renderer switches to Logos + Score and saves `mode: logos_score` and `active_ad: null`. That happens for every video, on every ground, on Pro and Mini. The old `auto_return_on_end` and per-ad `auto_return` flags are not consulted. An image stays on screen until someone switches. The save is one row update through `pulseplay_return_to_logos`. It matches the `updated_at` of the play that just finished, so a newer Ground controls command is not overwritten. A poll that still has the old play is ignored until that save, or a newer command, is read back. Ground controls and Command Center follow the saved mode.
 
 ### Views
 
@@ -128,7 +128,7 @@ Later, a small proxy or Supabase Edge Function can fetch the score server-side a
 
 ### Ad Library and ground setup
 
-**Ad Library** uploads an MP4, PNG, JPG, or a one-page PDF (saved as a PNG that fits in 1920×1080) with a name and description, lists every ad with a preview, and can delete one. Videos can auto-return to Logos + Score. An image stays up until someone switches. On the live Supabase adapter, anything over 50 MB is refused because the free plan rejects it. With `?adapter=mock`, a video over 50 MB asks before it is saved in this browser. Uploaded ads show up in Ground setup's checklist. Image ads are buttons after the video ads on Ground controls. Deleting an ad pulls it off every ground.
+**Ad Library** uploads an MP4, PNG, JPG, or a one-page PDF (saved as a PNG that fits in 1920×1080) with a name and description, lists every ad with a preview, and can delete one. A video returns to Logos + Score when it finishes. An image stays up until someone switches. On the live Supabase adapter, anything over 50 MB is refused because the free plan rejects it. With `?adapter=mock`, a video over 50 MB asks before it is saved in this browser. Uploaded ads show up in Ground setup's checklist. Image ads are buttons after the video ads on Ground controls. Deleting an ad pulls it off every ground.
 
 **Logo Library** is the same pattern for images: name, description, type (Age Group Sponsor, Tournament, CricketCrazeUSA, or Other), preview, list, delete. PNG, WebP, SVG, and JPG are stored as uploaded. JPG shows a note that it has no transparency. A PDF is rendered with pdf.js (page 1) to a PNG preview, and that PNG is what gets saved.
 
@@ -156,7 +156,7 @@ Background is transparent so the game video shows through View 1. Confirm on a d
 | Field | Notes |
 | --- | --- |
 | `poll_ms` | Fallback poll when Realtime is missed. 2000–300000. Default 2000 |
-| `auto_return_on_end` | Master switch for returning to View 1 |
+| `auto_return_on_end` | Kept on the document. The renderer ignores it. Every video returns to View 1 |
 | `assets[]` | Shared library. `kind` is `ad` or `logo`. See below |
 | `grounds[].id` | Slug used in `?ground=` |
 | `name` | Label |

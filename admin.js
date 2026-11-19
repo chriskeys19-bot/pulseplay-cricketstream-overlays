@@ -622,12 +622,10 @@
   }
 
   function renderLibrary() {
-    var box = document.getElementById("global-auto");
     var list = document.getElementById("ad-list");
     var ads = assetsOf("ad");
     var sig = librarySignature("ad");
     var i;
-    if (document.activeElement !== box) box.checked = currentDoc.auto_return_on_end !== false;
     if (sig === librarySig) return;
     librarySig = sig;
     clear(list);
@@ -694,8 +692,7 @@
     var preview = isImageMedia(ad) ? document.createElement("img") : document.createElement("video");
     var title = document.createElement("h3");
     var desc = document.createElement("p");
-    var label = document.createElement("label");
-    var toggle = document.createElement("input");
+    var label = document.createElement("p");
     var del = document.createElement("button");
     card.className = "ad-card";
     if (isImageMedia(ad)) {
@@ -718,21 +715,9 @@
     card.appendChild(preview);
     card.appendChild(title);
     card.appendChild(desc);
-    if (!isImageMedia(ad)) {
-      toggle.type = "checkbox";
-      toggle.checked = ad.auto_return !== false;
-      label.className = "check";
-      label.appendChild(toggle);
-      label.appendChild(document.createTextNode(" Auto-return when this ad ends"));
-      toggle.onchange = function () {
-        var live = findAd(currentDoc, ad.id);
-        if (!live) return;
-        live.auto_return = toggle.checked;
-        librarySig = "";
-        saveDoc("Saved auto-return for " + live.label + ".");
-      };
-      card.appendChild(label);
-    }
+    label.className = "hint";
+    setText(label, isImageMedia(ad) ? "Stays on screen until you switch." : "Returns to Logos + Score when it finishes.");
+    card.appendChild(label);
     card.appendChild(del);
     return card;
   }
@@ -1191,8 +1176,6 @@
     preparedAd = null;
     hideAdPreview();
     document.getElementById("ad-form").reset();
-    document.getElementById("ad-auto").checked = true;
-    document.getElementById("ad-auto-row").classList.remove("is-off");
     document.getElementById("ad-warn").classList.add("is-off");
   }
 
@@ -1215,7 +1198,6 @@
     preparingAd = false;
     preparedAd = null;
     hideAdPreview();
-    document.getElementById("ad-auto-row").classList.remove("is-off");
     if (!file) {
       warn.classList.add("is-off");
       return;
@@ -1225,7 +1207,6 @@
       warn.classList.remove("is-off");
       return;
     }
-    if (isStillAdFile(file)) document.getElementById("ad-auto-row").classList.add("is-off");
     if (isPdf(file)) {
       preparingAd = true;
       setText(warn, "Converting page 1 to a PNG…");
@@ -1287,7 +1268,7 @@
     store.putBlob(id, upload.file, function (err, info) {
       if (err) { showBanner(err.message || "Upload failed."); return; }
       currentDoc.assets.push(assetFromUpload(id, "ad", label, description, info, upload.file, {
-        auto_return: upload.image ? null : document.getElementById("ad-auto").checked,
+        auto_return: upload.image ? null : true,
         logo_type: null,
         media_type: upload.image ? "image" : "video"
       }));
@@ -1435,10 +1416,6 @@
       };
     }
   })();
-  document.getElementById("global-auto").onchange = function () {
-    currentDoc.auto_return_on_end = this.checked;
-    saveDoc(this.checked ? "Ads can return to View 1 when they end." : "Auto-return is off. Ads stay on the last frame.");
-  };
   document.getElementById("ad-file").onchange = function () {
     onAdFile(this.files && this.files[0]);
   };

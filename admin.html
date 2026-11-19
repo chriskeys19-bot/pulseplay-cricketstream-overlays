@@ -109,11 +109,10 @@
         <h2>Ad Library</h2>
         <p id="ad-library-intro">Upload an MP4, PNG, JPG, or a one-page PDF (saved as a PNG). It's stored in Pulse Play storage and becomes selectable in Ground setup. Each YoloBox preloads the ads assigned to its ground so switching is instant, so keep videos compressed (about 20–40 MB, 1080p).</p>
       </div>
-      <label class="check"><input type="checkbox" id="global-auto" checked> Auto-return to Logos + Score when an ad ends</label>
+      <p class="hint" id="ad-return-note">Every video returns to Logos + Score when it finishes, on every ground, Pro and Mini. An image stays until you switch.</p>
       <form id="ad-form" class="form">
         <label>Label <input id="ad-label" type="text" required></label>
         <label>Description <input id="ad-description" type="text"></label>
-        <label class="check" id="ad-auto-row"><input type="checkbox" id="ad-auto" checked> This ad returns to View 1 when it ends</label>
         <label>File <input id="ad-file" type="file" accept="video/mp4,image/png,image/jpeg,application/pdf,.mp4,.png,.jpg,.jpeg,.pdf" required></label>
         <p id="ad-warn" class="note is-off"></p>
         <img id="ad-convert-preview" class="logo-preview logo-convert-preview is-off" alt="Converted ad preview">
