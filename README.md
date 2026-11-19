@@ -61,7 +61,7 @@ sequenceDiagram
 
 `config/runtime.js` chooses the adapter. `adapter` is `"supabase"` now that the migration is applied on cheetahs-club. Add `?adapter=mock` to any page URL (admin or renderer) to use the local example config instead. The publishable key in that file is public client config.
 
-The Supabase adapter (`js/supabase-store.js`) talks to the existing project `cheetahs-club` (`https://lutcbvzunjcosncvdyke.supabase.co`) with `fetch`, and falls back to `XMLHttpRequest` if `fetch` is missing. Renderers stay logged out and only GET. They do not load supabase-js. The admin page loads the supabase-js UMD build so it can offer **Sign in with Google**, with email and password underneath. Google returns to this `admin.html` URL with the query and hash removed. After either sign-in, the page reads `profiles.role` and, if it is not `admin`, shows “This Google account isn't a Pulse Play admin” and a sign-out button. Writes send the admin access token. Realtime is enabled on `pp_grounds` and the adapter opens a socket when `WebSocket` exists. The poll still runs, so a missed socket message still lands within about 2 seconds.
+The Supabase adapter (`js/supabase-store.js`) talks to the existing project `cheetahs-club` (`https://lutcbvzunjcosncvdyke.supabase.co`) with `fetch`, and falls back to `XMLHttpRequest` if `fetch` is missing. Renderers stay logged out and only GET. They do not load supabase-js. The admin page loads the supabase-js UMD build so it can offer **Sign in with Google**, with email and password underneath. Google returns to this `admin.html` URL with the query and hash removed. After either sign-in, the page reads `profiles.role` and, if it is not `admin`, shows “This Google account isn't a Pulse Play admin” and a sign-out button. Writes send the admin access token. Realtime is enabled on `pp_grounds` and the adapter opens a socket when `WebSocket` exists. The poll still runs. Ground controls can set it from 2 to 300 seconds, so a missed socket message lands on the next poll rather than always within 2 seconds.
 
 Supabase only redirects back to URLs on the Auth allowlist. The public settings API does not list that allowlist, and `/authorize` accepts any `redirect_to` (it checks later). The club app itself only sends people to `https://cheetahs-club.pages.dev/auth/callback`. Add these if they are not already there, or Google sign-in lands on the club Site URL instead of this dashboard:
 
@@ -93,7 +93,7 @@ Expected latency, after the click:
 | Path | When the overlay hears about it | Plus the crossfade |
 | --- | --- | --- |
 | This browser, two tabs | The `storage` event, usually well under a second | 250ms |
-| Push missed | The next poll, default 2 seconds (`poll_ms` on the config, also editable on Ground controls) | 250ms |
+| Push missed | The next poll, 2–300 seconds (`poll_ms` on the config, set on Ground controls) | 250ms |
 | YoloBox today | It only has the seed file. Laptop clicks do not reach it | — |
 | YoloBox with Realtime | Network round trip, aimed at under a second | 250ms |
 
@@ -155,7 +155,7 @@ Background is transparent so the game video shows through View 1. Confirm on a d
 
 | Field | Notes |
 | --- | --- |
-| `poll_ms` | Fallback poll. Default 2000 |
+| `poll_ms` | Fallback poll when Realtime is missed. 2000–300000. Default 2000 |
 | `auto_return_on_end` | Master switch for returning to View 1 |
 | `assets[]` | Shared library. `kind` is `ad` or `logo`. See below |
 | `grounds[].id` | Slug used in `?ground=` |
