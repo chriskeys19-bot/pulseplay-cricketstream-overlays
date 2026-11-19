@@ -122,7 +122,7 @@ Logos and the score slot fade out. The chosen MP4 fills the stage. Placeholder s
 
 `score_url` is the CricClubs overlay URL for that ground, or a site-root path such as `scores/board.html?...` while a real overlay URL is not ready. The board is only a stand-in so the bug shows a total. Query keys: `batting`, `bowling`, `score`, `overs`, `rr`.
 
-CricClubs and many score hosts send `X-Frame-Options` or CSP `frame-ancestors`. The browser also blocks a cross-origin read, so the page cannot scrape the total. `cricclubs.com` is on a short deny-list so we do not wait on a frame that will be refused. Any other URL is still tried, and if it is blank after a few seconds the iframe is hidden and a link is shown. Command Center uses the same field and the same fallback.
+Some score hosts send `X-Frame-Options` or CSP `frame-ancestors`. The browser also blocks a cross-origin read, so the page cannot scrape the total. The deny-list is exact hosts only: `cricclubs.com` and `www.cricclubs.com`, both of which send `X-Frame-Options: SAMEORIGIN`. Subdomains are not blocked by that list. `overlay.cricclubs.com` is allowlisted; it is the CricClubs streaming overlay and sends neither header, so the score iframe loads it. The iframe is transparent so that overlay can sit on the stream. Any other URL is still tried, and if it is blank after a few seconds the iframe is hidden and a link is shown. Command Center uses the same rule and the same fallback.
 
 Later, a small proxy or Supabase Edge Function can fetch the score server-side and return a same-origin snippet, if the score site's terms allow it.
 
@@ -143,7 +143,7 @@ This repo therefore uses an explicit stage and scales that stage to the viewport
 | Device | Stage | Why |
 | --- | --- | --- |
 | Pro | 1920×1080 | Full-HD program. Set the overlay widget to 1920×1080. |
-| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. |
+| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. The age-group logo is 336px on Pro and 448px on Mini, set higher on the stage. The tournament logo is 135px on Pro and 158px on Mini. CricketCrazeUSA stays 190px and 220px, shifted down so its artwork lines up with the tournament logo. The score iframe is scaled 2.15× from its bottom center and sits about 20px lower so the painted bug stays on screen. |
 
 Percentage-free pixel placement inside the stage keeps the corners stable. `renderer/overlay.js` scales the stage with `transform` so a widget that is not exactly that size letterboxes instead of cropping.
 

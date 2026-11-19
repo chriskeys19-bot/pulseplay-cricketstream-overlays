@@ -22,7 +22,10 @@
   var DB_STORE = "blobs";
   var WARN_BYTES = 50 * 1024 * 1024;
   var MAX_BYTES = 80 * 1024 * 1024;
+  /* Exact hosts only. Both send X-Frame-Options: SAMEORIGIN.
+     overlay.cricclubs.com is the streaming overlay and does not. */
   var BLOCK_HOSTS = ["cricclubs.com", "www.cricclubs.com"];
+  var ALLOW_HOSTS = ["overlay.cricclubs.com"];
   var blobUrls = {};
 
   function detectSiteRoot() {
@@ -76,14 +79,12 @@
   function hostBlocksEmbed(url) {
     var host = hostnameOf(url);
     var i;
-    var blocked;
     if (!host) return false;
+    for (i = 0; i < ALLOW_HOSTS.length; i++) {
+      if (host === ALLOW_HOSTS[i]) return false;
+    }
     for (i = 0; i < BLOCK_HOSTS.length; i++) {
-      blocked = BLOCK_HOSTS[i];
-      if (host === blocked) return true;
-      if (host.length > blocked.length && host.substring(host.length - blocked.length - 1) === "." + blocked) {
-        return true;
-      }
+      if (host === BLOCK_HOSTS[i]) return true;
     }
     return false;
   }
