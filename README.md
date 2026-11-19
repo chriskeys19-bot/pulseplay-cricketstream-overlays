@@ -116,7 +116,7 @@ Placeholder art is in the Logo Library (`assets/logos/`, including one SVG). Gro
 
 **View 2**
 
-Logos and the score slot fade out. The chosen MP4 fills the stage. Placeholder spots are in `assets/ads/` (about 70 KB, 12 seconds, with a short tone). Real commercials replace them from the Ad Library.
+Logos and the score slot fade out. A video fills the stage. An image ad uses the same view, fitted inside the frame with a black letterbox, and stays until someone switches. Placeholder spots are in `assets/ads/` (about 70 KB, 12 seconds, with a short tone). Real commercials replace them from the Ad Library.
 
 ### Score embeds
 
