@@ -193,6 +193,7 @@
       logo_type: extra.logo_type,
       auto_return: extra.auto_return,
       media_type: extra.media_type || null,
+      logo_scale: extra.logo_scale || null,
       created_at: new Date().toISOString()
     };
     return asset;
@@ -616,7 +617,7 @@
     var item;
     for (i = 0; i < list.length; i++) {
       item = list[i];
-      parts.push(item.id + ":" + item.label + ":" + item.auto_return + ":" + item.logo_type + ":" + (item.media_type || "") + ":" + item.src);
+      parts.push(item.id + ":" + item.label + ":" + item.auto_return + ":" + item.logo_type + ":" + (item.media_type || "") + ":" + (item.logo_scale || "") + ":" + item.src);
     }
     return parts.join("|");
   }
@@ -675,6 +676,30 @@
     setText(title, logo.label);
     setText(type, logoTypeLabel(logo.logo_type));
     setText(desc, logo.description || "");
+    var scaleLabel = document.createElement("label");
+    var scale = document.createElement("input");
+    var scaleRead = document.createElement("span");
+    var scaleValue = logo.logo_scale ? Math.round(logo.logo_scale * 100) : 100;
+    scaleLabel.className = "check";
+    scale.type = "range";
+    scale.min = "25";
+    scale.max = "200";
+    scale.step = "5";
+    scale.value = String(scaleValue);
+    setText(scaleRead, scaleValue + "%");
+    scale.oninput = function () { setText(scaleRead, scale.value + "%"); };
+    scale.onchange = function () {
+      var live = findAsset(currentDoc, logo.id);
+      var next = Number(scale.value);
+      if (!live) return;
+      live.logo_scale = next === 100 ? null : next / 100;
+      logoSig = "";
+      setupSig = null;
+      saveDoc("Saved default scale for " + live.label + ".");
+    };
+    scaleLabel.appendChild(document.createTextNode(" Default scale "));
+    scaleLabel.appendChild(scale);
+    scaleLabel.appendChild(scaleRead);
     del.type = "button";
     del.className = "btn-danger";
     setText(del, "Delete");
@@ -683,6 +708,7 @@
     card.appendChild(title);
     card.appendChild(type);
     card.appendChild(desc);
+    card.appendChild(scaleLabel);
     card.appendChild(del);
     return card;
   }
@@ -738,7 +764,10 @@
     parts.push("assets");
     for (i = 0; i < currentDoc.assets.length; i++) {
       asset = currentDoc.assets[i];
-      parts.push(asset.kind + ":" + asset.id + ":" + asset.label + ":" + (asset.logo_type || "") + ":" + (asset.media_type || ""));
+      parts.push(asset.kind + ":" + asset.id + ":" + asset.label + ":" + (asset.logo_type || "") + ":" + (asset.media_type || "") + ":" + (asset.logo_scale || ""));
+    }
+    for (i = 0; i < currentDoc.grounds.length; i++) {
+      parts.push("layout:" + currentDoc.grounds[i].id + ":" + JSON.stringify(currentDoc.grounds[i].layout || null));
     }
     return parts.join("|");
   }
@@ -749,6 +778,154 @@
       if (select.options[i].value === value) return true;
     }
     return false;
+  }
+
+  var LAYOUT_LABELS = {
+    age: "Age group",
+    tournament: "Tournament",
+    cricketcraze: "CricketCrazeUSA",
+    score: "Score"
+  };
+
+  function layoutField(id, type, min, max, step, value) {
+    var input = document.createElement("input");
+    input.id = id;
+    input.type = type;
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(value);
+    return input;
+  }
+
+  function buildLayoutControls() {
+    var root = document.getElementById("layout-controls");
+    var names;
+    var i;
+    var name;
+    var box;
+    var title;
+    var scale;
+    var readout;
+    var nudge;
+    if (!root || !window.PulsePlayLayout) return;
+    names = window.PulsePlayLayout.slots;
+    clear(root);
+    for (i = 0; i < names.length; i++) {
+      name = names[i];
+      box = document.createElement("div");
+      title = document.createElement("p");
+      readout = document.createElement("span");
+      nudge = document.createElement("p");
+      box.className = "layout-slot";
+      title.className = "k";
+      setText(title, LAYOUT_LABELS[name]);
+      scale = layoutField("layout-" + name + "-scale", "range", 25, 200, 5, 100);
+      readout.id = "layout-" + name + "-readout";
+      setText(readout, "100%");
+      nudge.className = "hint";
+      nudge.appendChild(document.createTextNode("X "));
+      nudge.appendChild(layoutField("layout-" + name + "-x", "number", -400, 400, 1, 0));
+      nudge.appendChild(document.createTextNode(" Y "));
+      nudge.appendChild(layoutField("layout-" + name + "-y", "number", -400, 400, 1, 0));
+      box.appendChild(title);
+      box.appendChild(scale);
+      box.appendChild(readout);
+      box.appendChild(nudge);
+      root.appendChild(box);
+      scale.oninput = renderLayoutPreview;
+      nudge.getElementsByTagName("input")[0].oninput = renderLayoutPreview;
+      nudge.getElementsByTagName("input")[1].oninput = renderLayoutPreview;
+    }
+  }
+
+  function readLayoutForm() {
+    var raw = {};
+    var names = window.PulsePlayLayout.slots;
+    var i;
+    var name;
+    var scale;
+    var x;
+    var y;
+    for (i = 0; i < names.length; i++) {
+      name = names[i];
+      scale = document.getElementById("layout-" + name + "-scale");
+      x = document.getElementById("layout-" + name + "-x");
+      y = document.getElementById("layout-" + name + "-y");
+      raw[name] = {
+        scale: Number(scale && scale.value) / 100,
+        x: Number(x && x.value),
+        y: Number(y && y.value)
+      };
+    }
+    return window.PulsePlayLayout.normalize(raw);
+  }
+
+  function writeLayoutForm(layout) {
+    var norm = window.PulsePlayLayout.normalize(layout);
+    var names = window.PulsePlayLayout.slots;
+    var i;
+    var name;
+    var slot;
+    for (i = 0; i < names.length; i++) {
+      name = names[i];
+      slot = norm[name];
+      document.getElementById("layout-" + name + "-scale").value = String(Math.round(slot.scale * 100));
+      document.getElementById("layout-" + name + "-x").value = String(slot.x);
+      document.getElementById("layout-" + name + "-y").value = String(slot.y);
+      setText(document.getElementById("layout-" + name + "-readout"), Math.round(slot.scale * 100) + "%");
+    }
+  }
+
+  function setLayoutLogo(id, asset) {
+    var img = document.getElementById(id);
+    if (!img) return;
+    if (!asset) {
+      img.classList.add("is-off");
+      img.removeAttribute("src");
+      return;
+    }
+    img.classList.remove("is-off");
+    previewSrc(img, asset.src);
+  }
+
+  function renderLayoutPreview() {
+    var preview = document.getElementById("layout-preview");
+    var stage = document.getElementById("layout-stage");
+    var names;
+    var i;
+    var scale;
+    var age;
+    var tournament;
+    var ccusa;
+    if (!preview || !stage || !window.PulsePlayLayout || !currentDoc) return;
+    names = window.PulsePlayLayout.slots;
+    for (i = 0; i < names.length; i++) {
+      scale = document.getElementById("layout-" + names[i] + "-scale");
+      setText(document.getElementById("layout-" + names[i] + "-readout"), (scale ? scale.value : "100") + "%");
+    }
+    scale = preview.clientWidth / 1920;
+    if (!scale || scale <= 0) scale = 0.5;
+    stage.style.transform = "scale(" + scale + ")";
+    age = findAsset(currentDoc, document.getElementById("pick-age").value);
+    tournament = findAsset(currentDoc, document.getElementById("pick-tournament").value);
+    ccusa = findAsset(currentDoc, document.getElementById("pick-ccusa").value);
+    window.PulsePlayLayout.place({
+      device: document.getElementById("field-device").value,
+      layout: readLayoutForm(),
+      scales: {
+        age: age && age.logo_scale,
+        tournament: tournament && tournament.logo_scale,
+        cricketcraze: ccusa && ccusa.logo_scale
+      },
+      age: document.getElementById("layout-age"),
+      tournament: document.getElementById("layout-tournament"),
+      cricketcraze: document.getElementById("layout-ccusa"),
+      score: document.getElementById("layout-score")
+    });
+    setLayoutLogo("layout-age", age);
+    setLayoutLogo("layout-tournament", tournament);
+    setLayoutLogo("layout-ccusa", ccusa);
   }
 
   function readSetupDraft() {
@@ -765,7 +942,8 @@
       age: document.getElementById("pick-age").value,
       tournament: document.getElementById("pick-tournament").value,
       ccusa: document.getElementById("pick-ccusa").value,
-      ads: checkedAdIds()
+      ads: checkedAdIds(),
+      layout: readLayoutForm()
     };
   }
 
@@ -786,6 +964,8 @@
     previewPickedLogo("pick-age", "preview-age");
     previewPickedLogo("pick-tournament", "preview-tournament");
     previewPickedLogo("pick-ccusa", "preview-ccusa");
+    writeLayoutForm(draft.layout);
+    renderLayoutPreview();
   }
 
   function renderSetupList() {
@@ -868,9 +1048,11 @@
         document.getElementById("field-device").value = "pro";
         document.getElementById("field-score").value = "";
         setText(document.getElementById("field-resolved"), "Resolved URL is filled in when you save.");
+        writeLayoutForm(null);
       } else {
         applySetupDraft(draft);
       }
+      renderLayoutPreview();
       return;
     }
     document.getElementById("field-id").readOnly = true;
@@ -882,9 +1064,11 @@
       document.getElementById("field-device").value = ground.device;
       document.getElementById("field-score").value = ground.score_url;
       setText(document.getElementById("field-resolved"), "Resolves to " + ground.resolved_url);
+      writeLayoutForm(ground.layout);
     } else {
       applySetupDraft(draft);
     }
+    renderLayoutPreview();
   }
 
   function fillLogoSelect(selectId, preferred, selectedId) {
@@ -1096,6 +1280,7 @@
       tournament: document.getElementById("pick-tournament").value,
       cricketcraze: document.getElementById("pick-ccusa").value
     };
+    ground.layout = window.PulsePlayLayout.isDefault(readLayoutForm()) ? null : readLayoutForm();
     ground.ad_ids = adIds;
     if (ground.active_ad && indexOf(adIds, ground.active_ad) === -1) {
       ground.mode = "logos_score";
@@ -1288,6 +1473,7 @@
     hideLogoPreview();
     document.getElementById("logo-form").reset();
     document.getElementById("logo-type").value = "other";
+    setText(document.getElementById("logo-scale-readout"), "100%");
     warn.classList.add("is-off");
     setText(warn, "");
   }
@@ -1384,7 +1570,8 @@
       if (err) { showBanner(err.message || "Upload failed."); return; }
       currentDoc.assets.push(assetFromUpload(id, "logo", label, description, info, upload.file, {
         auto_return: null,
-        logo_type: logoType
+        logo_type: logoType,
+        logo_scale: Number(document.getElementById("logo-scale").value) === 100 ? null : Number(document.getElementById("logo-scale").value) / 100
       }));
       clearLogoForm();
       logoSig = "";
@@ -1430,13 +1617,24 @@
   document.getElementById("field-id").oninput = function () { idTouched = true; };
   document.getElementById("ground-form").onsubmit = onSaveGround;
   document.getElementById("btn-delete-ground").onclick = onDeleteGround;
-  document.getElementById("pick-age").onchange = function () { previewPickedLogo("pick-age", "preview-age"); };
-  document.getElementById("pick-tournament").onchange = function () { previewPickedLogo("pick-tournament", "preview-tournament"); };
-  document.getElementById("pick-ccusa").onchange = function () { previewPickedLogo("pick-ccusa", "preview-ccusa"); };
+  document.getElementById("pick-age").onchange = function () { previewPickedLogo("pick-age", "preview-age"); renderLayoutPreview(); };
+  document.getElementById("pick-tournament").onchange = function () { previewPickedLogo("pick-tournament", "preview-tournament"); renderLayoutPreview(); };
+  document.getElementById("pick-ccusa").onchange = function () { previewPickedLogo("pick-ccusa", "preview-ccusa"); renderLayoutPreview(); };
+  document.getElementById("field-device").onchange = renderLayoutPreview;
+  document.getElementById("btn-layout-reset").onclick = function () {
+    writeLayoutForm(null);
+    renderLayoutPreview();
+  };
   document.getElementById("btn-ccusa-default").onclick = function () {
     document.getElementById("pick-ccusa").value = "logo-cricketcraze";
     previewPickedLogo("pick-ccusa", "preview-ccusa");
+    renderLayoutPreview();
   };
+  document.getElementById("logo-scale").oninput = function () {
+    setText(document.getElementById("logo-scale-readout"), this.value + "%");
+  };
+  buildLayoutControls();
+  window.addEventListener("resize", renderLayoutPreview);
   document.getElementById("logo-file").onchange = function () {
     onLogoFile(this.files && this.files[0]);
   };

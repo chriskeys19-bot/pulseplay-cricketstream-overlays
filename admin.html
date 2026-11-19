@@ -129,6 +129,10 @@
       <form id="logo-form" class="form">
         <label>Name <input id="logo-label" type="text" required></label>
         <label>Description <input id="logo-description" type="text"></label>
+        <label>Default scale <span id="logo-scale-readout">100%</span>
+          <input id="logo-scale" type="range" min="25" max="200" step="5" value="100">
+        </label>
+        <p class="hint">Optional. Multiplies the ground's slot scale. Use it when the file has extra padding. 100% leaves the slot size alone.</p>
         <label>Type
           <select id="logo-type">
             <option value="age_group_sponsor">Age Group Sponsor</option>
@@ -188,6 +192,22 @@
         </div>
 
         <fieldset>
+          <legend>Layout</legend>
+          <p class="hint">Each slider is a percent of that device's base size. Nudge is pixels on the 1920×1080 stage. Positive X moves right. Positive Y moves down. Logos fit inside the slot, so a square mark and a wide mark stay in the same box. Save ground to send it to the YoloBox.</p>
+          <div id="layout-controls" class="layout-controls"></div>
+          <button type="button" id="btn-layout-reset" class="btn-text">Reset to default</button>
+        </fieldset>
+
+        <div id="layout-preview" class="layout-preview">
+          <div id="layout-stage" class="layout-stage">
+            <img id="layout-age" class="logo logo-age" alt="">
+            <img id="layout-tournament" class="logo logo-tournament" alt="">
+            <img id="layout-ccusa" class="logo logo-ccusa" alt="">
+            <div id="layout-score" class="layout-score"><div class="layout-score-graphic">Score</div></div>
+          </div>
+        </div>
+
+        <fieldset>
           <legend>Ads for this ground</legend>
           <div id="ad-checks"></div>
         </fieldset>
@@ -208,6 +228,7 @@
   <script src="js/storage.js"></script>
   <script src="js/supabase-store.js"></script>
   <script src="js/score-frame.js"></script>
+  <script src="js/layout.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

@@ -52,7 +52,10 @@ body.mode-ad #view-ad { opacity: 1; }
 }
 #ad-slots img.is-active { opacity: 1; }
 body.mode-image #view-ad { background: #000; }
-.logo { display: block; height: auto; }
+.logo { display: block; object-fit: contain; }
+.logo-age { object-position: left top; }
+.logo-tournament { object-position: left bottom; }
+.logo-ccusa { object-position: right bottom; }
 #score-slot { position: absolute; overflow: visible; background: transparent; }
 #score-frame {
   width: 100%;

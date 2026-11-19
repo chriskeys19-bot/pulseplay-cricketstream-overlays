@@ -90,6 +90,12 @@
     return asset ? asset.src : "";
   }
 
+  function logoScaleFor(doc, id) {
+    var asset = findAsset(doc, id);
+    if (!asset || !window.PulsePlayLayout) return 1;
+    return window.PulsePlayLayout.logoMultiplier(asset.logo_scale);
+  }
+
   function fitStage() {
     var stage = document.getElementById("stage");
     var w;
@@ -551,6 +557,21 @@
     setLogo("logo-age", assetSrc(doc, logos.age_group_sponsor));
     setLogo("logo-tournament", assetSrc(doc, logos.tournament));
     setLogo("logo-ccusa", assetSrc(doc, logos.cricketcraze));
+    if (window.PulsePlayLayout) {
+      window.PulsePlayLayout.place({
+        device: document.body.getAttribute("data-device"),
+        layout: ground.layout,
+        scales: {
+          age: logoScaleFor(doc, logos.age_group_sponsor),
+          tournament: logoScaleFor(doc, logos.tournament),
+          cricketcraze: logoScaleFor(doc, logos.cricketcraze)
+        },
+        age: document.getElementById("logo-age"),
+        tournament: document.getElementById("logo-tournament"),
+        cricketcraze: document.getElementById("logo-ccusa"),
+        score: document.getElementById("score-slot")
+      });
+    }
     setScore(ground.score_url);
     ensureAds(doc, ground);
     if (ground.mode === "ad" && ground.active_ad) showAd(ground.active_ad);
