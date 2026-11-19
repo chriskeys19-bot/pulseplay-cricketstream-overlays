@@ -1,8 +1,8 @@
 /* YoloBox Mini. Same 1920×1080 stage as Pro. Larger logos and type so they
    read on the Mini's smaller panel. overlay.js scales the stage to the widget. */
 #stage { width: 1920px; height: 1080px; }
-.logo-age { position: absolute; top: 36px; left: 36px; width: 560px; }
-.logo-tournament { position: absolute; left: 28px; bottom: 36px; width: 175px; }
+.logo-age { position: absolute; top: 18px; left: 36px; width: 448px; }
+.logo-tournament { position: absolute; left: 28px; bottom: 36px; width: 158px; }
 .logo-ccusa { position: absolute; right: 28px; bottom: 36px; width: 220px; }
 #score-slot {
   left: 50%;
