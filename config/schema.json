@@ -20,7 +20,7 @@
     },
     "assets": {
       "type": "array",
-      "description": "Shared library. kind ad is an MP4. kind logo is a PNG, WebP, or SVG.",
+      "description": "Shared library. kind ad is an MP4 or a still image (PNG, JPG, or a PDF page saved as PNG). kind logo is a PNG, WebP, SVG, or JPG.",
       "items": { "$ref": "#/definitions/asset" }
     },
     "grounds": {
@@ -57,6 +57,13 @@
           ]
         },
         "auto_return": { "type": ["boolean", "null"] },
+        "media_type": {
+          "anyOf": [
+            { "type": "string", "enum": ["video", "image"] },
+            { "type": "null" }
+          ],
+          "description": "Ads only. image stays on screen until switched. video can auto-return."
+        },
         "created_at": { "type": "string", "format": "date-time" }
       }
     },

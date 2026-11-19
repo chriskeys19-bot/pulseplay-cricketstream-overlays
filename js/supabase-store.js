@@ -209,6 +209,7 @@
           size: row.size,
           logo_type: row.logo_type,
           auto_return: row.auto_return,
+          media_type: row.kind === "ad" ? (row.media_type === "image" ? "image" : "video") : null,
           created_at: row.created_at
         });
       }
@@ -305,7 +306,8 @@
             mime: asset.mime || null,
             size: asset.size || null,
             logo_type: asset.logo_type || null,
-            auto_return: asset.kind === "ad" ? asset.auto_return !== false : null,
+            media_type: asset.kind === "ad" ? (asset.media_type === "image" ? "image" : "video") : null,
+            auto_return: asset.kind === "ad" && asset.media_type !== "image" ? asset.auto_return !== false : null,
             created_at: asset.created_at
           });
         }
@@ -458,7 +460,7 @@
 
     function putBlob(id, file, callback) {
       withToken(function (err, token) {
-        var folder = (file.type || "").indexOf("video/") === 0 ? "ads" : "logos";
+        var folder = file.adFolder || ((file.type || "").indexOf("video/") === 0 ? "ads" : "logos");
         var path = folder + "/" + id + extOf(file);
         if (err) { callback(err); return; }
         if (file.size > 50 * 1024 * 1024) {
