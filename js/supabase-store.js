@@ -450,6 +450,7 @@
       var dot = name.lastIndexOf(".");
       if (dot !== -1) return name.substring(dot);
       if ((file.type || "").indexOf("video/") === 0) return ".mp4";
+      if (file.type === "image/jpeg" || file.type === "image/jpg") return ".jpg";
       if (file.type === "image/webp") return ".webp";
       if (file.type === "image/svg+xml") return ".svg";
       return ".png";
