@@ -10,9 +10,9 @@
     "version": { "type": "integer", "minimum": 3 },
     "poll_ms": {
       "type": "integer",
-      "minimum": 500,
-      "maximum": 30000,
-      "description": "How often a renderer re-reads the config when a push is missed. Default 2000."
+      "minimum": 2000,
+      "maximum": 300000,
+      "description": "How often a renderer re-reads the config when a Realtime update is missed. 2 to 300 seconds. Default 2000."
     },
     "auto_return_on_end": {
       "type": "boolean",

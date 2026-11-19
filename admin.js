@@ -18,6 +18,8 @@
   var controlsSig = "";
   var idTouched = false;
   var polling = false;
+  var POLL_MIN_SECONDS = 2;
+  var POLL_MAX_SECONDS = 300;
 
   function setText(node, text) {
     if (!node) return;
@@ -274,8 +276,7 @@
   function renderStatus() {
     var ground = findGround(currentDoc, currentId);
     var localLink = document.getElementById("local-overlay");
-    var pollInput = document.getElementById("poll-seconds");
-    var seconds;
+    syncPollField();
     if (!ground) {
       setText(document.getElementById("st-name"), "No grounds yet");
       setText(document.getElementById("st-device"), "—");
@@ -301,10 +302,42 @@
     document.getElementById("st-score").href = window.PulsePlayStore.safeUrl(ground.score_url) || "#";
     localLink.href = "renderer/" + ground.device + ".html?ground=" + encodeURIComponent(ground.id) + "&device=" + ground.device;
     setText(localLink, "Open " + (ground.device === "mini" ? "Mini" : "Pro") + " overlay for this ground");
-    if (document.activeElement !== pollInput) {
-      seconds = Math.round((currentDoc.poll_ms || 2000) / 1000);
-      pollInput.value = String(seconds);
+  }
+
+  function clampPollSeconds(seconds) {
+    seconds = parseInt(seconds, 10);
+    if (!seconds || seconds < POLL_MIN_SECONDS) return POLL_MIN_SECONDS;
+    if (seconds > POLL_MAX_SECONDS) return POLL_MAX_SECONDS;
+    return seconds;
+  }
+
+  function markPollPick(seconds) {
+    var buttons = document.getElementById("poll-picks").getElementsByTagName("button");
+    var i;
+    var picked;
+    for (i = 0; i < buttons.length; i++) {
+      picked = parseInt(buttons[i].getAttribute("data-seconds"), 10) === seconds;
+      if (picked) buttons[i].classList.add("is-on");
+      else buttons[i].classList.remove("is-on");
+      buttons[i].setAttribute("aria-pressed", picked ? "true" : "false");
     }
+  }
+
+  function syncPollField() {
+    var pollInput = document.getElementById("poll-seconds");
+    var seconds;
+    if (!currentDoc || document.activeElement === pollInput) return;
+    seconds = clampPollSeconds(Math.round((currentDoc.poll_ms || 2000) / 1000));
+    pollInput.value = String(seconds);
+    markPollPick(seconds);
+  }
+
+  function savePollSeconds(raw) {
+    var seconds = clampPollSeconds(raw);
+    document.getElementById("poll-seconds").value = String(seconds);
+    markPollPick(seconds);
+    currentDoc.poll_ms = seconds * 1000;
+    saveDoc("Poll interval saved (" + seconds + "s). A missed live update can take that long to reach the YoloBox.");
   }
 
   function makeAction(action, label, onclick) {
@@ -1217,13 +1250,17 @@
     renderActions();
   };
   document.getElementById("poll-seconds").onchange = function () {
-    var seconds = parseInt(this.value, 10);
-    if (!seconds || seconds < 1) seconds = 1;
-    if (seconds > 30) seconds = 30;
-    this.value = String(seconds);
-    currentDoc.poll_ms = seconds * 1000;
-    saveDoc("Poll interval saved (" + seconds + "s). Open overlays pick it up on the next read.");
+    savePollSeconds(this.value);
   };
+  (function wirePollPicks() {
+    var buttons = document.getElementById("poll-picks").getElementsByTagName("button");
+    var i;
+    for (i = 0; i < buttons.length; i++) {
+      buttons[i].onclick = function () {
+        savePollSeconds(this.getAttribute("data-seconds"));
+      };
+    }
+  })();
   document.getElementById("global-auto").onchange = function () {
     currentDoc.auto_return_on_end = this.checked;
     saveDoc(this.checked ? "Ads can return to View 1 when they end." : "Auto-return is off. Ads stay on the last frame.");

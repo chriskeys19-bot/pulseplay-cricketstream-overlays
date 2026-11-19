@@ -330,7 +330,8 @@
     if (ground.mode === "ad" && ground.active_ad) showAd(ground.active_ad);
     else showLogos();
     nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;
-    if (nextPoll < 500) nextPoll = 500;
+    if (nextPoll < 2000) nextPoll = 2000;
+    if (nextPoll > 300000) nextPoll = 300000;
     if (nextPoll !== pollMs) {
       pollMs = nextPoll;
       schedule();
