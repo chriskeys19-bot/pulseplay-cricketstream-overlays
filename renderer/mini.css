@@ -2,14 +2,14 @@
    read on the Mini's smaller panel. overlay.js scales the stage to the widget. */
 #stage { width: 1920px; height: 1080px; }
 .logo-age { position: absolute; top: 36px; left: 36px; width: 560px; }
-.logo-tournament { position: absolute; left: 28px; bottom: 36px; width: 315px; }
-.logo-ccusa { position: absolute; right: 28px; bottom: 36px; width: 315px; }
+.logo-tournament { position: absolute; left: 28px; bottom: 36px; width: 220px; }
+.logo-ccusa { position: absolute; right: 28px; bottom: 36px; width: 220px; }
 #score-slot {
   left: 50%;
   bottom: 40px;
-  width: 1156px;
-  height: 248px;
-  margin-left: -578px;
+  width: 1376px;
+  height: 372px;
+  margin-left: -688px;
 }
-#score-fallback { font-size: 36px; line-height: 248px; }
+#score-fallback { font-size: 36px; line-height: 372px; }
 #overlay-status span { font-size: 42px; }
