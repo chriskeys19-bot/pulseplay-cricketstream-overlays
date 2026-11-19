@@ -143,7 +143,7 @@ This repo therefore uses an explicit stage and scales that stage to the viewport
 | Device | Stage | Why |
 | --- | --- | --- |
 | Pro | 1920×1080 | Full-HD program. Set the overlay widget to 1920×1080. |
-| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. |
+| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. On both devices the bottom tournament and CricketCrazeUSA logos are 25% smaller than the first layout, and the score iframe is about 18% larger, still clear of those corners. |
 
 Percentage-free pixel placement inside the stage keeps the corners stable. `renderer/overlay.js` scales the stage with `transform` so a widget that is not exactly that size letterboxes instead of cropping.
 

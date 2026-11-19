@@ -1,14 +1,14 @@
 /* YoloBox Pro. Explicit 1920×1080 stage. overlay.js scales it to the widget. */
 #stage { width: 1920px; height: 1080px; }
 .logo-age { position: absolute; top: 40px; left: 40px; width: 420px; }
-.logo-tournament { position: absolute; left: 40px; bottom: 40px; width: 360px; }
-.logo-ccusa { position: absolute; right: 40px; bottom: 40px; width: 360px; }
+.logo-tournament { position: absolute; left: 40px; bottom: 40px; width: 270px; }
+.logo-ccusa { position: absolute; right: 40px; bottom: 40px; width: 270px; }
 #score-slot {
   left: 50%;
   bottom: 48px;
-  width: 880px;
-  height: 168px;
-  margin-left: -440px;
+  width: 1040px;
+  height: 198px;
+  margin-left: -520px;
 }
-#score-fallback { font-size: 28px; line-height: 168px; }
+#score-fallback { font-size: 28px; line-height: 198px; }
 #overlay-status span { font-size: 32px; }
