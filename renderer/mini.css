@@ -3,7 +3,7 @@
 #stage { width: 1920px; height: 1080px; }
 .logo-age { position: absolute; top: 18px; left: 36px; width: 448px; }
 .logo-tournament { position: absolute; left: 28px; bottom: 36px; width: 158px; }
-.logo-ccusa { position: absolute; right: 28px; bottom: 36px; width: 220px; }
+.logo-ccusa { position: absolute; right: 28px; bottom: 13px; width: 220px; }
 #score-slot {
   left: 50%;
   bottom: 40px;
