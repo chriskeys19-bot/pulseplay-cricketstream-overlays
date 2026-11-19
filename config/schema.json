@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/config/schema.json",
+  "title": "Pulse Play YoloBox overlay config",
+  "description": "One document for every ground. Ads and logos share the assets list (kind ad or logo). Uploaded bytes are not in this document: src is a site path, an idb: key, or a Storage public URL.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "poll_ms", "auto_return_on_end", "assets", "grounds"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 3 },
+    "poll_ms": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 30000,
+      "description": "How often a renderer re-reads the config when a push is missed. Default 2000."
+    },
+    "auto_return_on_end": {
+      "type": "boolean",
+      "description": "Master switch. When true, an ad with auto_return true returns to Logos + Score at the end of the file."
+    },
+    "assets": {
+      "type": "array",
+      "description": "Shared library. kind ad is an MP4. kind logo is a PNG, WebP, or SVG.",
+      "items": { "$ref": "#/definitions/asset" }
+    },
+    "grounds": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/ground" }
+    }
+  },
+  "definitions": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "label", "description", "src", "storage_path", "created_at"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9-]+$" },
+        "kind": { "type": "string", "enum": ["ad", "logo"] },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "src": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Playable or displayable URL: site path, idb:<key>, or a Storage public URL."
+        },
+        "storage_path": {
+          "type": "string",
+          "description": "Repo path, idb key, or object path inside the pulseplay-assets bucket."
+        },
+        "mime": { "type": ["string", "null"] },
+        "size": { "type": ["integer", "null"] },
+        "logo_type": {
+          "anyOf": [
+            { "type": "string", "enum": ["age_group_sponsor", "tournament", "cricketcraze", "other"] },
+            { "type": "null" }
+          ]
+        },
+        "auto_return": { "type": ["boolean", "null"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "logos": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["age_group_sponsor", "tournament", "cricketcraze"],
+      "description": "Asset ids from the library, not raw URLs.",
+      "properties": {
+        "age_group_sponsor": { "type": "string" },
+        "tournament": { "type": "string" },
+        "cricketcraze": { "type": "string" }
+      }
+    },
+    "ground": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "short_link",
+        "resolved_url",
+        "device",
+        "mode",
+        "active_ad",
+        "score_url",
+        "logos",
+        "ad_ids",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Stable id. The renderer URL is ?ground=<id>&device=pro|mini."
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "short_link": {
+          "type": "string",
+          "format": "uri",
+          "description": "The one short URL loaded by the YoloBox for this ground."
+        },
+        "resolved_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "GitHub Pages URL the short link redirects to."
+        },
+        "device": { "type": "string", "enum": ["pro", "mini"] },
+        "mode": {
+          "type": "string",
+          "enum": ["logos_score", "ad"],
+          "description": "logos_score is View 1. ad is View 2 and uses active_ad."
+        },
+        "active_ad": {
+          "description": "Ad id while mode is ad. null on View 1.",
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "score_url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CricClubs overlay URL for this ground. The renderer and Command Center both iframe this field."
+        },
+        "logos": { "$ref": "#/definitions/logos" },
+        "ad_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Ads from the library that the control view may play at this ground."
+        },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scoreboard placeholder</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #07140c;
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      height: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: #07140c;
+    }
+    td {
+      vertical-align: middle;
+      white-space: nowrap;
+      overflow: hidden;
+      line-height: 1;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #f6f3ea;
+      padding: 0 1.2vw;
+      border-top: 0.4vw solid #e4b75a;
+    }
+    .name { width: 24%; font-size: 3.6vw; font-weight: 700; }
+    .score { width: 18%; font-size: 5vw; font-weight: 700; color: #e4b75a; }
+    .meta { width: 17%; font-size: 3vw; color: #c5cebb; }
+    .opp { width: 24%; font-size: 3vw; color: #c5cebb; text-align: right; }
+  </style>
+</head>
+<body>
+  <table>
+    <tr>
+      <td class="name" id="batting">Score</td>
+      <td class="score" id="score">—</td>
+      <td class="meta" id="overs"></td>
+      <td class="meta" id="rr"></td>
+      <td class="opp" id="bowling"></td>
+    </tr>
+  </table>
+  <script>
+    (function () {
+      function param(name) {
+        var query = window.location.search;
+        var parts;
+        var i;
+        var pair;
+        var key;
+        if (!query) return "";
+        if (query.charAt(0) === "?") query = query.substring(1);
+        parts = query.split("&");
+        for (i = 0; i < parts.length; i++) {
+          pair = parts[i].split("=");
+          try {
+            key = decodeURIComponent((pair[0] || "").replace(/\+/g, " "));
+          } catch (e) {
+            key = pair[0] || "";
+          }
+          if (key === name) {
+            try {
+              return decodeURIComponent((pair[1] || "").replace(/\+/g, " "));
+            } catch (e2) {
+              return pair[1] || "";
+            }
+          }
+        }
+        return "";
+      }
+
+      function text(id, value) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        if (node.textContent !== undefined) node.textContent = value;
+        else node.innerText = value;
+      }
+
+      var batting = param("batting");
+      var bowling = param("bowling");
+      var score = param("score");
+      var overs = param("overs");
+      var rr = param("rr");
+
+      text("batting", batting || "Score");
+      text("score", score || "—");
+      text("overs", overs ? (overs + " ov") : "");
+      text("rr", rr ? ("RR " + rr) : "");
+      text("bowling", bowling ? ("vs " + bowling) : "");
+    })();
+  </script>
+</body>
+</html>

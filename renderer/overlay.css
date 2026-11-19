@@ -1,0 +1,78 @@
+/* Shared by Pro and Mini. Device files set the stage size and logo placement.
+   Both views stay in the DOM. Opacity is the only switch, so the score iframe is not recreated. */
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+#stage {
+  position: absolute;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background: transparent;
+}
+.view {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  transition: opacity 250ms linear;
+}
+body.mode-logos-score #view-logos { opacity: 1; }
+body.mode-ad #view-ad { opacity: 1; }
+#view-ad { background: #07140c; }
+#ad-slots,
+#ad-slots video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+#ad-slots video {
+  opacity: 0;
+  object-fit: contain;
+  background: #07140c;
+}
+#ad-slots video.is-active { opacity: 1; }
+.logo { display: block; height: auto; }
+#score-slot { position: absolute; overflow: hidden; background: transparent; }
+#score-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+#score-fallback {
+  margin: 0;
+  height: 100%;
+  box-sizing: border-box;
+  background: #07140c;
+  color: #f6f3ea;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  text-align: center;
+}
+#score-fallback a { color: #e4b75a; }
+#overlay-status {
+  position: absolute;
+  top: 8%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 5;
+}
+#overlay-status span {
+  display: inline-block;
+  background: #07140c;
+  color: #f6f3ea;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  padding: 12px 18px;
+}
+.is-off { display: none !important; }

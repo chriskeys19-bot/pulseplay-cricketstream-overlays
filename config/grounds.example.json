@@ -1,0 +1,311 @@
+{
+  "version": 3,
+  "poll_ms": 2000,
+  "auto_return_on_end": true,
+  "assets": [
+    {
+      "id": "spot-1",
+      "kind": "ad",
+      "label": "Ad 1",
+      "description": "Placeholder spot. Replace with a real MP4 in the Ad Library.",
+      "src": "assets/ads/ad1.mp4",
+      "storage_path": "assets/ads/ad1.mp4",
+      "mime": "video/mp4",
+      "size": null,
+      "logo_type": null,
+      "auto_return": true,
+      "created_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "spot-2",
+      "kind": "ad",
+      "label": "Ad 2",
+      "description": "Second placeholder spot.",
+      "src": "assets/ads/ad2.mp4",
+      "storage_path": "assets/ads/ad2.mp4",
+      "mime": "video/mp4",
+      "size": null,
+      "logo_type": null,
+      "auto_return": true,
+      "created_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "spot-3",
+      "kind": "ad",
+      "label": "Ad 3",
+      "description": "Third placeholder spot.",
+      "src": "assets/ads/ad3.mp4",
+      "storage_path": "assets/ads/ad3.mp4",
+      "mime": "video/mp4",
+      "size": null,
+      "logo_type": null,
+      "auto_return": true,
+      "created_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "spot-4",
+      "kind": "ad",
+      "label": "Ad 4",
+      "description": "Fourth placeholder spot.",
+      "src": "assets/ads/ad4.mp4",
+      "storage_path": "assets/ads/ad4.mp4",
+      "mime": "video/mp4",
+      "size": null,
+      "logo_type": null,
+      "auto_return": true,
+      "created_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "logo-age-group",
+      "kind": "logo",
+      "label": "Age group sponsor",
+      "description": "Placeholder age-group badge.",
+      "src": "assets/logos/age-group.png",
+      "storage_path": "assets/logos/age-group.png",
+      "mime": "image/png",
+      "size": null,
+      "logo_type": "age_group_sponsor",
+      "auto_return": null,
+      "created_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "logo-tournament",
+      "kind": "logo",
+      "label": "Tournament",
+      "description": "Placeholder tournament mark.",
+      "src": "assets/logos/tournament.png",
+      "storage_path": "assets/logos/tournament.png",
+      "mime": "image/png",
+      "size": null,
+      "logo_type": "tournament",
+      "auto_return": null,
+      "created_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "logo-cricketcraze",
+      "kind": "logo",
+      "label": "CricketCrazeUSA",
+      "description": "Shared CricketCrazeUSA mark. Grounds use this unless they pick another.",
+      "src": "assets/logos/cricketcraze.png",
+      "storage_path": "assets/logos/cricketcraze.png",
+      "mime": "image/png",
+      "size": null,
+      "logo_type": "cricketcraze",
+      "auto_return": null,
+      "created_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "logo-mark",
+      "kind": "logo",
+      "label": "Other mark",
+      "description": "Transparent SVG placeholder.",
+      "src": "assets/logos/mark.svg",
+      "storage_path": "assets/logos/mark.svg",
+      "mime": "image/svg+xml",
+      "size": null,
+      "logo_type": "other",
+      "auto_return": null,
+      "created_at": "2026-11-19T15:00:00Z"
+    }
+  ],
+  "grounds": [
+    {
+      "id": "cheetahs-home",
+      "name": "Cheetahs CC \u2014 Home",
+      "short_link": "https://short.sg/pp-cheetahs-home",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=cheetahs-home&device=pro",
+      "device": "pro",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Cheetahs&bowling=Deccan&score=186%2F4&overs=32.1&rr=5.78",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-1",
+        "spot-2"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "ccu-featured",
+      "name": "CricketCrazeUSA \u2014 Featured",
+      "short_link": "https://short.sg/pp-featured",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=ccu-featured&device=pro",
+      "device": "pro",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "https://cricclubs.com/",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-1"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "cheetahs-home-mini",
+      "name": "Cheetahs CC \u2014 Home",
+      "short_link": "https://short.sg/pp-cheetahs-home-mini",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/mini.html?ground=cheetahs-home-mini&device=mini",
+      "device": "mini",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Cheetahs&bowling=Deccan&score=186%2F4&overs=32.1&rr=5.78",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-1",
+        "spot-2"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "cheetahs-away",
+      "name": "Cheetahs CC \u2014 Away",
+      "short_link": "https://short.sg/pp-cheetahs-away",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=cheetahs-away&device=pro",
+      "device": "pro",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Cheetahs&bowling=Atlanta&score=94%2F2&overs=16.3&rr=5.70",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-1",
+        "spot-3"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "cheetahs-t20",
+      "name": "Cheetahs CC \u2014 T20 Cup",
+      "short_link": "https://short.sg/pp-cheetahs-t20",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=cheetahs-t20&device=pro",
+      "device": "pro",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Cheetahs&bowling=Houston&score=211%2F6&overs=20.0&rr=10.55",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-1",
+        "spot-2",
+        "spot-3",
+        "spot-4"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "saturday-league",
+      "name": "Cheetahs CC \u2014 Saturday League",
+      "short_link": "https://short.sg/pp-saturday",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=saturday-league&device=pro",
+      "device": "pro",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Cheetahs&bowling=Knights&score=45%2F1&overs=7.2&rr=6.25",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-2"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "sunday-league",
+      "name": "Cheetahs CC \u2014 Sunday League",
+      "short_link": "https://short.sg/pp-sunday",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=sunday-league&device=pro",
+      "device": "pro",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Cheetahs&bowling=Titans&score=128%2F5&overs=24.0&rr=5.33",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-3",
+        "spot-4"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "pulse-practice",
+      "name": "Pulse Play \u2014 Practice",
+      "short_link": "https://short.sg/pp-practice",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=pulse-practice&device=pro",
+      "device": "pro",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Practice&bowling=Nets&score=12%2F0&overs=2.4&rr=4.50",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-4"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "t20-mini",
+      "name": "Cheetahs CC \u2014 T20 Cup",
+      "short_link": "https://short.sg/pp-t20-mini",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/mini.html?ground=t20-mini&device=mini",
+      "device": "mini",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "scores/board.html?batting=Cheetahs&bowling=Houston&score=211%2F6&overs=20.0&rr=10.55",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-2",
+        "spot-3"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    },
+    {
+      "id": "featured-mini",
+      "name": "CricketCrazeUSA \u2014 Featured",
+      "short_link": "https://short.sg/pp-featured-mini",
+      "resolved_url": "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/mini.html?ground=featured-mini&device=mini",
+      "device": "mini",
+      "mode": "logos_score",
+      "active_ad": null,
+      "score_url": "https://cricclubs.com/",
+      "logos": {
+        "age_group_sponsor": "logo-age-group",
+        "tournament": "logo-tournament",
+        "cricketcraze": "logo-cricketcraze"
+      },
+      "ad_ids": [
+        "spot-1"
+      ],
+      "updated_at": "2026-11-19T15:00:00Z"
+    }
+  ]
+}

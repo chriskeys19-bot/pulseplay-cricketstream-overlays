@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YoloBox Mini overlay</title>
+  <style>html,body{background:transparent;margin:0;height:100%;overflow:hidden}</style>
+  <link rel="stylesheet" href="overlay.css">
+  <link rel="stylesheet" href="mini.css">
+</head>
+<body class="mode-logos-score" data-device="mini">
+  <div id="stage" data-w="1280" data-h="720">
+    <div id="view-logos" class="view">
+      <img id="logo-age" class="logo logo-age" alt="Age group sponsor">
+      <img id="logo-tournament" class="logo logo-tournament" alt="Tournament">
+      <img id="logo-ccusa" class="logo logo-ccusa" alt="CricketCrazeUSA">
+      <div id="score-slot">
+        <iframe id="score-frame" title="Match score" scrolling="no" referrerpolicy="no-referrer"></iframe>
+        <p id="score-fallback" class="is-off">
+          <span>This score source blocks embedding.</span>
+          <a id="score-fallback-link" target="_blank" rel="noopener">Open score</a>
+        </p>
+      </div>
+    </div>
+    <div id="view-ad" class="view">
+      <div id="ad-slots"></div>
+    </div>
+    <p id="overlay-status" class="is-off"><span id="overlay-status-text"></span></p>
+  </div>
+  <script src="../config/runtime.js"></script>
+  <script src="../js/storage.js"></script>
+  <script src="../js/supabase-store.js"></script>
+  <script src="../js/score-frame.js"></script>
+  <script src="overlay.js"></script>
+</body>
+</html>
