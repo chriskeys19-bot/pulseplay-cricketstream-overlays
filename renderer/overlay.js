@@ -9,6 +9,7 @@
   });
   var groundId = queryParam("ground");
   var videos = {};
+  var stills = {};
   var currentDoc = null;
   var soundUnlocked = false;
   var pollMs = window.PulsePlayStore.DEFAULT_POLL_MS;
@@ -238,54 +239,87 @@
     });
   }
 
-  function ensureVideos(doc, ground) {
+  function isImageAd(ad) {
+    var mime;
+    if (!ad) return false;
+    if (ad.media_type === "image") return true;
+    if (ad.media_type === "video") return false;
+    mime = (ad.mime || "").toLowerCase();
+    return mime.indexOf("image/") === 0;
+  }
+
+  function dropNode(map, key) {
+    if (!map[key]) return;
+    if (map[key].parentNode) map[key].parentNode.removeChild(map[key]);
+    delete map[key];
+  }
+
+  function ensureAds(doc, ground) {
     var slots = document.getElementById("ad-slots");
     var wanted = {};
     var ids = ground.ad_ids || [];
     var i;
     var ad;
-    var video;
+    var node;
     var key;
+    var image;
     for (i = 0; i < ids.length; i++) {
       ad = findAd(doc, ids[i]);
       if (!ad) continue;
       wanted[ad.id] = ad;
-      video = videos[ad.id];
-      if (!video) {
-        video = document.createElement("video");
-        video.setAttribute("preload", "auto");
-        video.setAttribute("playsinline", "");
-        video.setAttribute("webkit-playsinline", "");
-        video.muted = true;
-        video.loop = false;
-        video.setAttribute("data-ad-id", ad.id);
-        videos[ad.id] = video;
-        slots.appendChild(video);
-        (function (adId, node) {
-          node.addEventListener("ended", function () { onEnded(adId); });
-        })(ad.id, video);
+      image = isImageAd(ad);
+      if (image && videos[ad.id]) {
+        quiet(videos[ad.id]);
+        dropNode(videos, ad.id);
       }
-      if (video.getAttribute("data-src") !== ad.src) {
-        video.setAttribute("data-src", ad.src);
-        (function (node, src) {
+      if (!image && stills[ad.id]) dropNode(stills, ad.id);
+      node = image ? stills[ad.id] : videos[ad.id];
+      if (!node) {
+        if (image) {
+          node = document.createElement("img");
+          node.alt = "";
+          stills[ad.id] = node;
+        } else {
+          node = document.createElement("video");
+          node.setAttribute("preload", "auto");
+          node.setAttribute("playsinline", "");
+          node.setAttribute("webkit-playsinline", "");
+          node.muted = true;
+          node.loop = false;
+          videos[ad.id] = node;
+          (function (adId, video) {
+            video.addEventListener("ended", function () { onEnded(adId); });
+          })(ad.id, node);
+        }
+        node.setAttribute("data-ad-id", ad.id);
+        slots.appendChild(node);
+      }
+      if (node.getAttribute("data-src") !== ad.src) {
+        node.setAttribute("data-src", ad.src);
+        (function (el, src, isImage) {
           store.mediaUrl(src, function (err, url) {
             if (err || !url) return;
-            if (node.getAttribute("data-src") !== src) return;
-            node.src = url;
-            try { node.load(); } catch (e) {}
-            if (node.getAttribute("data-want-play") === "1") {
-              node.removeAttribute("data-playing");
-              showAd(node.getAttribute("data-ad-id"));
+            if (el.getAttribute("data-src") !== src) return;
+            el.src = url;
+            if (!isImage) {
+              try { el.load(); } catch (e) {}
+            }
+            if (el.getAttribute("data-want-play") === "1") {
+              el.removeAttribute("data-playing");
+              showAd(el.getAttribute("data-ad-id"));
             }
           });
-        })(video, ad.src);
+        })(node, ad.src, image);
       }
     }
     for (key in videos) {
       if (!videos.hasOwnProperty(key) || wanted[key]) continue;
       quiet(videos[key]);
-      if (videos[key].parentNode) videos[key].parentNode.removeChild(videos[key]);
-      delete videos[key];
+      dropNode(videos, key);
+    }
+    for (key in stills) {
+      if (!stills.hasOwnProperty(key) || wanted[key]) continue;
+      dropNode(stills, key);
     }
   }
 
@@ -326,10 +360,19 @@
     ad.style.opacity = toAd ? "1" : "0";
   }
 
+  function hideStills() {
+    var key;
+    for (key in stills) {
+      if (stills.hasOwnProperty(key)) stills[key].classList.remove("is-active");
+    }
+  }
+
   function showLogos() {
     var key;
     showSoundChip(false);
+    document.body.classList.remove("mode-image");
     setMode("logos");
+    hideStills();
     for (key in videos) {
       if (videos.hasOwnProperty(key)) quiet(videos[key]);
     }
@@ -337,23 +380,38 @@
 
   function showAd(adId) {
     var key;
-    var video;
+    var ad = findAd(currentDoc, adId);
+    var image = isImageAd(ad);
+    var node;
     setMode("ad");
+    if (image) {
+      document.body.classList.add("mode-image");
+      showSoundChip(false);
+    } else {
+      document.body.classList.remove("mode-image");
+    }
     for (key in videos) {
-      if (!videos.hasOwnProperty(key) || key === adId) continue;
+      if (!videos.hasOwnProperty(key)) continue;
+      if (!image && key === adId) continue;
       quiet(videos[key]);
     }
-    video = videos[adId];
-    if (!video) return;
-    video.classList.add("is-active");
-    if (video.getAttribute("data-playing") === "1") return;
-    if (!video.src) {
-      video.setAttribute("data-want-play", "1");
+    hideStills();
+    node = image ? stills[adId] : videos[adId];
+    if (!node) return;
+    node.classList.add("is-active");
+    if (image) {
+      if (!node.getAttribute("src")) node.setAttribute("data-want-play", "1");
+      else node.removeAttribute("data-want-play");
       return;
     }
-    video.removeAttribute("data-want-play");
-    video.setAttribute("data-playing", "1");
-    playVideo(video);
+    if (node.getAttribute("data-playing") === "1") return;
+    if (!node.src) {
+      node.setAttribute("data-want-play", "1");
+      return;
+    }
+    node.removeAttribute("data-want-play");
+    node.setAttribute("data-playing", "1");
+    playVideo(node);
   }
 
   function schedule() {
@@ -383,7 +441,7 @@
     setLogo("logo-tournament", assetSrc(doc, logos.tournament));
     setLogo("logo-ccusa", assetSrc(doc, logos.cricketcraze));
     setScore(ground.score_url);
-    ensureVideos(doc, ground);
+    ensureAds(doc, ground);
     if (ground.mode === "ad" && ground.active_ad) showAd(ground.active_ad);
     else showLogos();
     nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;

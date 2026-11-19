@@ -64,10 +64,25 @@
     return type === "image/jpeg" || type === "image/jpg" || fileSuffix(name, ".jpg") || fileSuffix(name, ".jpeg");
   }
 
+  function isPng(file) {
+    var type = (file.type || "").toLowerCase();
+    var name = (file.name || "").toLowerCase();
+    return type === "image/png" || fileSuffix(name, ".png");
+  }
+
   function isPdf(file) {
     var type = (file.type || "").toLowerCase();
     var name = (file.name || "").toLowerCase();
     return type === "application/pdf" || fileSuffix(name, ".pdf");
+  }
+
+  function isImageMedia(asset) {
+    var mime;
+    if (!asset || asset.kind !== "ad") return false;
+    if (asset.media_type === "image") return true;
+    if (asset.media_type === "video") return false;
+    mime = (asset.mime || "").toLowerCase();
+    return mime.indexOf("image/") === 0;
   }
 
   function isLogoFile(file) {
@@ -106,8 +121,12 @@
     preview.classList.remove("is-off");
   }
 
-  function pdfToPng(file, callback) {
+  function pdfToPng(file, fit, callback) {
     var reader = new FileReader();
+    if (typeof fit === "function") {
+      callback = fit;
+      fit = { longEdge: 1000 };
+    }
     reader.onerror = function () { callback(new Error("Could not read that PDF.")); };
     reader.onload = function () {
       var data = new Uint8Array(reader.result);
@@ -121,8 +140,10 @@
         return pdf.getPage(1);
       }).then(function (page) {
         var base = page.getViewport({ scale: 1 });
-        var longEdge = Math.max(base.width, base.height) || 1;
-        var viewport = page.getViewport({ scale: 1000 / longEdge });
+        var scale = fit.longEdge
+          ? fit.longEdge / (Math.max(base.width, base.height) || 1)
+          : Math.min(fit.maxWidth / base.width, fit.maxHeight / base.height);
+        var viewport = page.getViewport({ scale: scale });
         var canvas = document.createElement("canvas");
         var ctx;
         canvas.width = Math.max(1, Math.round(viewport.width));
@@ -137,7 +158,7 @@
         canvas.toBlob(function (blob) {
           var name;
           if (!blob) { callback(new Error("Could not convert that PDF to a PNG.")); return; }
-          name = (file.name || "logo.pdf").replace(/\.pdf$/i, "") + ".png";
+          name = (file.name || "page.pdf").replace(/\.pdf$/i, "") + ".png";
           callback(null, new File([blob], name, { type: "image/png" }));
         }, "image/png");
       }).catch(function (err) {
@@ -171,6 +192,7 @@
       size: file.size || 0,
       logo_type: extra.logo_type,
       auto_return: extra.auto_return,
+      media_type: extra.media_type || null,
       created_at: new Date().toISOString()
     };
     return asset;
@@ -340,6 +362,21 @@
     saveDoc("Poll interval saved (" + seconds + "s). A missed live update can take that long to reach the YoloBox.");
   }
 
+  function controlAdIds(ground) {
+    var ids = (ground && ground.ad_ids) || [];
+    var videos = [];
+    var images = [];
+    var i;
+    var ad;
+    for (i = 0; i < ids.length; i++) {
+      ad = findAd(currentDoc, ids[i]);
+      if (!ad) continue;
+      if (isImageMedia(ad)) images.push(ad.id);
+      else videos.push(ad.id);
+    }
+    return videos.concat(images);
+  }
+
   function makeAction(action, label, onclick) {
     var button = document.createElement("button");
     button.type = "button";
@@ -353,7 +390,7 @@
   function renderActions() {
     var ground = findGround(currentDoc, currentId);
     var bar = document.getElementById("action-bar");
-    var ids = (ground && ground.ad_ids) || [];
+    var ids = controlAdIds(ground);
     var sig = ground ? ground.id + "|" + ids.join(",") : "";
     var buttons;
     var i;
@@ -418,6 +455,27 @@
     setText(childByClass(card, "card__name"), ground.name);
     setText(mode, modeLabel(currentDoc, ground));
     setText(childByClass(card, "card__time"), "Updated " + formatTime(ground.updated_at));
+    syncCardStill(card, ground);
+  }
+
+  function syncCardStill(card, ground) {
+    var still = childByClass(card, "card-ad-still");
+    var frame = card.getElementsByTagName("iframe")[0];
+    var ad = ground.mode === "ad" ? findAd(currentDoc, ground.active_ad) : null;
+    if (!still || !frame) return;
+    if (ad && isImageMedia(ad)) {
+      frame.classList.add("is-off");
+      still.classList.remove("is-off");
+      if (still.getAttribute("data-src") !== ad.src) {
+        still.setAttribute("data-src", ad.src);
+        store.mediaUrl(ad.src, function (err, url) {
+          if (!err && url && still.getAttribute("data-src") === ad.src) still.src = url;
+        });
+      }
+      return;
+    }
+    still.classList.add("is-off");
+    frame.classList.remove("is-off");
   }
 
   function buildCard(ground) {
@@ -455,6 +513,10 @@
     shortP.appendChild(shortA);
     time.className = "card__time";
     slot.className = "score-slot";
+    var still = document.createElement("img");
+    still.className = "card-ad-still is-off";
+    still.alt = "";
+    slot.appendChild(still);
     iframe.setAttribute("title", ground.name + " score");
     iframe.setAttribute("scrolling", "no");
     iframe.setAttribute("referrerpolicy", "no-referrer");
@@ -554,7 +616,7 @@
     var item;
     for (i = 0; i < list.length; i++) {
       item = list[i];
-      parts.push(item.id + ":" + item.label + ":" + item.auto_return + ":" + item.logo_type + ":" + item.src);
+      parts.push(item.id + ":" + item.label + ":" + item.auto_return + ":" + item.logo_type + ":" + (item.media_type || "") + ":" + item.src);
     }
     return parts.join("|");
   }
@@ -629,41 +691,48 @@
 
   function buildAdCard(ad) {
     var card = document.createElement("article");
-    var video = document.createElement("video");
+    var preview = isImageMedia(ad) ? document.createElement("img") : document.createElement("video");
     var title = document.createElement("h3");
     var desc = document.createElement("p");
     var label = document.createElement("label");
     var toggle = document.createElement("input");
     var del = document.createElement("button");
     card.className = "ad-card";
-    video.setAttribute("controls", "");
-    video.setAttribute("preload", "metadata");
-    video.setAttribute("playsinline", "");
+    if (isImageMedia(ad)) {
+      preview.className = "logo-preview";
+      preview.alt = "";
+    } else {
+      preview.setAttribute("controls", "");
+      preview.setAttribute("preload", "metadata");
+      preview.setAttribute("playsinline", "");
+    }
     store.mediaUrl(ad.src, function (err, url) {
-      if (!err && url) video.src = url;
+      if (!err && url) preview.src = url;
     });
     setText(title, ad.label);
     setText(desc, ad.description || "");
-    toggle.type = "checkbox";
-    toggle.checked = ad.auto_return !== false;
-    label.className = "check";
-    label.appendChild(toggle);
-    label.appendChild(document.createTextNode(" Auto-return when this ad ends"));
-    toggle.onchange = function () {
-      var live = findAd(currentDoc, ad.id);
-      if (!live) return;
-      live.auto_return = toggle.checked;
-      librarySig = "";
-      saveDoc("Saved auto-return for " + live.label + ".");
-    };
     del.type = "button";
     del.className = "btn-danger";
     setText(del, "Delete");
     del.onclick = function () { deleteAsset(ad.id); };
-    card.appendChild(video);
+    card.appendChild(preview);
     card.appendChild(title);
     card.appendChild(desc);
-    card.appendChild(label);
+    if (!isImageMedia(ad)) {
+      toggle.type = "checkbox";
+      toggle.checked = ad.auto_return !== false;
+      label.className = "check";
+      label.appendChild(toggle);
+      label.appendChild(document.createTextNode(" Auto-return when this ad ends"));
+      toggle.onchange = function () {
+        var live = findAd(currentDoc, ad.id);
+        if (!live) return;
+        live.auto_return = toggle.checked;
+        librarySig = "";
+        saveDoc("Saved auto-return for " + live.label + ".");
+      };
+      card.appendChild(label);
+    }
     card.appendChild(del);
     return card;
   }
@@ -684,7 +753,7 @@
     parts.push("assets");
     for (i = 0; i < currentDoc.assets.length; i++) {
       asset = currentDoc.assets[i];
-      parts.push(asset.kind + ":" + asset.id + ":" + asset.label + ":" + (asset.logo_type || ""));
+      parts.push(asset.kind + ":" + asset.id + ":" + asset.label + ":" + (asset.logo_type || "") + ":" + (asset.media_type || ""));
     }
     return parts.join("|");
   }
@@ -779,7 +848,7 @@
       box.value = ad.id;
       if (ground && indexOf(ground.ad_ids || [], ad.id) !== -1) box.checked = true;
       label.appendChild(box);
-      label.appendChild(document.createTextNode(" " + ad.label));
+      label.appendChild(document.createTextNode(" " + ad.label + (isImageMedia(ad) ? " (image)" : "")));
       checks.appendChild(label);
     }
     if (!ads.length) {
@@ -1087,40 +1156,145 @@
     saveDoc("Deleted " + ground.name + ".");
   }
 
+  var adConvertToken = 0;
+  var preparingAd = false;
+  var preparedAd = null;
+
+  function isStillAdFile(file) {
+    return !!(file && (isPng(file) || isJpeg(file) || isPdf(file)));
+  }
+
+  function isAdFile(file) {
+    return !!(file && (isMp4(file) || isStillAdFile(file)));
+  }
+
+  function hideAdPreview() {
+    var preview = document.getElementById("ad-convert-preview");
+    if (!preview) return;
+    if (preview.getAttribute("src")) {
+      try { URL.revokeObjectURL(preview.src); } catch (e) {}
+    }
+    preview.removeAttribute("src");
+    preview.classList.add("is-off");
+  }
+
+  function showAdPreview(file) {
+    var preview = document.getElementById("ad-convert-preview");
+    hideAdPreview();
+    preview.src = URL.createObjectURL(file);
+    preview.classList.remove("is-off");
+  }
+
+  function clearAdForm() {
+    adConvertToken += 1;
+    preparingAd = false;
+    preparedAd = null;
+    hideAdPreview();
+    document.getElementById("ad-form").reset();
+    document.getElementById("ad-auto").checked = true;
+    document.getElementById("ad-auto-row").classList.remove("is-off");
+    document.getElementById("ad-warn").classList.add("is-off");
+  }
+
+  function adUploadFile(file) {
+    if (isPdf(file)) {
+      if (preparingAd) return { error: "Still converting that PDF. The preview appears when page 1 is ready." };
+      if (!preparedAd || preparedAd.key !== fileKey(file)) return { error: "That PDF did not convert. Choose it again." };
+      return { file: preparedAd.file, image: true };
+    }
+    if (isJpeg(file)) return { file: jpegFile(file), image: true };
+    if (isPng(file)) return { file: file, image: true };
+    return { file: file, image: false };
+  }
+
+  function onAdFile(file) {
+    var warn = document.getElementById("ad-warn");
+    var token;
+    adConvertToken += 1;
+    token = adConvertToken;
+    preparingAd = false;
+    preparedAd = null;
+    hideAdPreview();
+    document.getElementById("ad-auto-row").classList.remove("is-off");
+    if (!file) {
+      warn.classList.add("is-off");
+      return;
+    }
+    if (!isAdFile(file)) {
+      setText(warn, "Ads must be MP4, PNG, JPG, or PDF.");
+      warn.classList.remove("is-off");
+      return;
+    }
+    if (isStillAdFile(file)) document.getElementById("ad-auto-row").classList.add("is-off");
+    if (isPdf(file)) {
+      preparingAd = true;
+      setText(warn, "Converting page 1 to a PNG…");
+      warn.classList.remove("is-off");
+      pdfToPng(file, { maxWidth: 1920, maxHeight: 1080 }, function (err, pngFile) {
+        if (token !== adConvertToken) return;
+        preparingAd = false;
+        if (err) {
+          setText(warn, err.message || "Could not convert that PDF.");
+          return;
+        }
+        preparedAd = { key: fileKey(file), file: pngFile };
+        showAdPreview(pngFile);
+        setText(warn, "Page 1 converted to a PNG that fits in 1920×1080. This preview is what will be saved. An image stays on screen until you switch.");
+      });
+      return;
+    }
+    if (!isMp4(file)) {
+      setText(warn, "An image stays on screen until you switch. It does not auto-return.");
+      warn.classList.remove("is-off");
+      return;
+    }
+    if (adOverFreePlan(file)) {
+      setText(warn, useSupabase
+        ? adFreePlanError(file)
+        : "This file is " + mb(file.size) + ". Each YoloBox preloads its assigned ads over the ground's internet.");
+      warn.classList.remove("is-off");
+      return;
+    }
+    warn.classList.add("is-off");
+  }
+
   function onAddAd(event) {
     var fileInput = document.getElementById("ad-file");
     var file = fileInput.files && fileInput.files[0];
     var label = document.getElementById("ad-label").value.replace(/^\s+|\s+$/g, "");
     var description = document.getElementById("ad-description").value.replace(/^\s+|\s+$/g, "");
-    var auto = document.getElementById("ad-auto").checked;
+    var upload;
     var id;
     event.preventDefault();
     if (!label) { showBanner("Give the ad a label."); return; }
-    if (!file) { showBanner("Choose an MP4."); return; }
-    if (!isMp4(file)) { showBanner("That file is not an MP4."); return; }
+    if (!file) { showBanner("Choose an MP4, PNG, JPG, or PDF."); return; }
+    if (!isAdFile(file)) { showBanner("Ads must be MP4, PNG, JPG, or PDF."); return; }
     if (useSupabase && adOverFreePlan(file)) {
       showBanner(adFreePlanError(file));
       return;
     }
-    if (!useSupabase && file.size > window.PulsePlayStore.MAX_BYTES) {
+    if (!useSupabase && isMp4(file) && file.size > window.PulsePlayStore.MAX_BYTES) {
       showBanner("That MP4 is " + mb(file.size) + ", over the " + mb(window.PulsePlayStore.MAX_BYTES) + " limit for this browser.");
       return;
     }
-    if (!useSupabase && adOverFreePlan(file)) {
+    if (!useSupabase && isMp4(file) && adOverFreePlan(file)) {
       if (!window.confirm("This file is " + mb(file.size) + ". Each YoloBox preloads its assigned ads over the ground's internet. Save it anyway?")) return;
     }
+    upload = adUploadFile(file);
+    if (upload.error) { showBanner(upload.error); return; }
+    try { upload.file.adFolder = "ads"; } catch (e) {}
     id = "upload-" + new Date().getTime();
-    store.putBlob(id, file, function (err, info) {
+    store.putBlob(id, upload.file, function (err, info) {
       if (err) { showBanner(err.message || "Upload failed."); return; }
-      currentDoc.assets.push(assetFromUpload(id, "ad", label, description, info, file, {
-        auto_return: auto,
-        logo_type: null
+      currentDoc.assets.push(assetFromUpload(id, "ad", label, description, info, upload.file, {
+        auto_return: upload.image ? null : document.getElementById("ad-auto").checked,
+        logo_type: null,
+        media_type: upload.image ? "image" : "video"
       }));
-      document.getElementById("ad-form").reset();
-      document.getElementById("ad-auto").checked = true;
-      document.getElementById("ad-warn").classList.add("is-off");
+      clearAdForm();
       librarySig = "";
       setupSig = null;
+      actionSig = "";
       saveDoc("Added " + label + " to the library. Assign it to a ground before it can go on air.");
     });
   }
@@ -1266,22 +1440,7 @@
     saveDoc(this.checked ? "Ads can return to View 1 when they end." : "Auto-return is off. Ads stay on the last frame.");
   };
   document.getElementById("ad-file").onchange = function () {
-    var file = this.files && this.files[0];
-    var warn = document.getElementById("ad-warn");
-    if (!file) return;
-    if (!isMp4(file)) {
-      setText(warn, "Please choose an MP4.");
-      warn.classList.remove("is-off");
-      return;
-    }
-    if (adOverFreePlan(file)) {
-      setText(warn, useSupabase
-        ? adFreePlanError(file)
-        : "This file is " + mb(file.size) + ". Each YoloBox preloads its assigned ads over the ground's internet.");
-      warn.classList.remove("is-off");
-      return;
-    }
-    warn.classList.add("is-off");
+    onAdFile(this.files && this.files[0]);
   };
   document.getElementById("ad-form").onsubmit = onAddAd;
   document.getElementById("setup-select").onchange = loadSetupForm;
@@ -1469,7 +1628,7 @@
 
   (function applyLibraryCopy() {
     if (useSupabase) return;
-    setText(document.getElementById("ad-library-intro"), "Upload an MP4 (sound is allowed). It becomes selectable in Ground setup. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
+    setText(document.getElementById("ad-library-intro"), "Upload an MP4, PNG, JPG, or a one-page PDF (saved as a PNG). It becomes selectable in Ground setup. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
     setText(document.getElementById("logo-library-intro"), "Upload a PNG, WebP, SVG, or JPG. A PDF is converted to a PNG of page 1 in this browser. Files stay in this browser's IndexedDB, so a YoloBox will not see them yet.");
   })();
 

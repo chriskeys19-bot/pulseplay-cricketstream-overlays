@@ -128,7 +128,7 @@ Later, a small proxy or Supabase Edge Function can fetch the score server-side a
 
 ### Ad Library and ground setup
 
-**Ad Library** uploads an MP4 with a name and description, lists every ad with a preview, and can delete one. The file must be an MP4. On the live Supabase adapter, anything over 50 MB is refused because the free plan rejects it. With `?adapter=mock`, a file over 50 MB asks before it is saved in this browser. Uploaded ads show up in Ground setup's checklist. Deleting an ad pulls it off every ground.
+**Ad Library** uploads an MP4, PNG, JPG, or a one-page PDF (saved as a PNG that fits in 1920×1080) with a name and description, lists every ad with a preview, and can delete one. Videos can auto-return to Logos + Score. An image stays up until someone switches. On the live Supabase adapter, anything over 50 MB is refused because the free plan rejects it. With `?adapter=mock`, a video over 50 MB asks before it is saved in this browser. Uploaded ads show up in Ground setup's checklist. Image ads are buttons after the video ads on Ground controls. Deleting an ad pulls it off every ground.
 
 **Logo Library** is the same pattern for images: name, description, type (Age Group Sponsor, Tournament, CricketCrazeUSA, or Other), preview, list, delete. PNG, WebP, SVG, and JPG are stored as uploaded. JPG shows a note that it has no transparency. A PDF is rendered with pdf.js (page 1) to a PNG preview, and that PNG is what gets saved.
 
