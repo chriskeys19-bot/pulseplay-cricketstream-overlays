@@ -89,6 +89,8 @@
         </div>
       </div>
       <p class="hint" id="poll-hint">The overlay listens for Supabase Realtime on grounds, so a Logos + Score or ad switch usually shows up right away. If that live update is missed, the YoloBox waits for the next poll, which can take as long as this interval.</p>
+      <label class="check" id="audio-row"><input type="checkbox" id="play-audio" checked> Play ad audio</label>
+      <p class="hint" id="audio-hint">Video ads start with sound. If the YoloBox browser rejects that, the page plays the picture and then clears mute and calls play() again. The Audio Mixer WEB source has to be ON with the fader up, which is a box setting, not a page setting. Add <code>&amp;audio=1</code> to a renderer URL to force those sound attempts. If it is still silent after that, the WebView is blocking autoplay audio and the page cannot override it.</p>
 
       <p class="hint"><a id="local-overlay" href="renderer/pro.html" target="_blank" rel="noopener">Open overlay</a></p>
       <div id="action-bar" class="actions" aria-label="Overlay actions"></div>

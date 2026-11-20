@@ -37,9 +37,21 @@ body.mode-ad #view-ad { opacity: 1; }
 #ad-slots video {
   opacity: 0;
   object-fit: contain;
-  background: #07140c;
+  background: transparent;
 }
-#ad-slots video.is-active { opacity: 1; }
+#ad-slots video.is-active.is-framed { opacity: 1; }
+#ad-slots video::-webkit-media-controls,
+#ad-slots video::-webkit-media-controls-enclosure,
+#ad-slots video::-webkit-media-controls-panel,
+#ad-slots video::-webkit-media-controls-play-button,
+#ad-slots video::-webkit-media-controls-start-playback-button,
+#ad-slots video::-webkit-media-controls-overlay-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
 #ad-slots img {
   position: absolute;
   top: 0;
@@ -92,19 +104,5 @@ body.mode-image #view-ad { background: #000; }
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
   padding: 12px 18px;
-}
-#sound-chip {
-  position: absolute;
-  top: 28px;
-  right: 28px;
-  z-index: 8;
-  margin: 0;
-  padding: 8px 12px;
-  border: 0;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font: 700 20px/1.2 Arial, Helvetica, sans-serif;
-  cursor: pointer;
 }
 .is-off { display: none !important; }

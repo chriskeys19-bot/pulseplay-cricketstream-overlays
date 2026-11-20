@@ -13,6 +13,8 @@
   var stills = {};
   var currentDoc = null;
   var soundUnlocked = false;
+  var audioCtx = null;
+  var SILENT_POSTER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   var returnHold = null;
   var returnTimer = null;
   var pollMs = window.PulsePlayStore.DEFAULT_POLL_MS;
@@ -157,6 +159,7 @@
     url = video.getAttribute("data-resolved") || video.currentSrc || "";
     if (url) video.setAttribute("data-resolved", url);
     video.classList.remove("is-active");
+    video.classList.remove("is-framed");
     video.muted = true;
     video.removeAttribute("data-playing");
     video.removeAttribute("data-want-play");
@@ -187,6 +190,7 @@
     video.setAttribute("data-resolved", url);
     parkOthers(video);
     video.classList.add("is-active");
+    video.classList.remove("is-framed");
     video.setAttribute("data-arming", "1");
     try { video.pause(); } catch (e) {}
     video.src = url;
@@ -196,11 +200,59 @@
     playVideo(video);
   }
 
-  function showSoundChip(on) {
-    var chip = document.getElementById("sound-chip");
-    if (!chip) return;
-    if (on && !soundUnlocked) chip.classList.remove("is-off");
-    else chip.classList.add("is-off");
+  function showSoundChip() {}
+
+  function audioQuery() {
+    var value = queryParam("audio");
+    if (value === "1" || value === "true") return "on";
+    if (value === "0" || value === "false") return "off";
+    return "";
+  }
+
+  function wantAudio() {
+    var flag = audioQuery();
+    var ground;
+    if (flag === "on" || soundUnlocked) return true;
+    if (flag === "off") return false;
+    ground = findGround(currentDoc);
+    if (!ground || ground.play_audio == null) return true;
+    return ground.play_audio !== false;
+  }
+
+  function resumeAudio() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var source;
+    var buffer;
+    if (!AC) return;
+    try {
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state !== "running" && audioCtx.resume) {
+        var pending = audioCtx.resume();
+        if (pending && pending.catch) pending.catch(function () {});
+      }
+      buffer = audioCtx.createBuffer(1, 1, 22050);
+      source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      source.start(0);
+    } catch (e) {}
+  }
+
+  function markAudible(video) {
+    video.removeAttribute("muted");
+    video.defaultMuted = false;
+    video.muted = false;
+    video.volume = 1;
+  }
+
+  function revealVideo(video) {
+    if (!video || video.getAttribute("data-playing") !== "1") return;
+    if (!video.classList.contains("is-active")) return;
+    video.classList.add("is-framed");
+    document.body.classList.remove("mode-image");
+    hideStills();
+    setMode("ad");
+    finishArm(video);
   }
 
   function activeVideo() {
@@ -213,52 +265,89 @@
 
   function unlockSound() {
     var video;
-    var result;
     if (soundUnlocked) return;
     soundUnlocked = true;
-    showSoundChip(false);
     video = activeVideo();
     if (!video) return;
-    video.muted = false;
-    try {
-      result = video.play();
-      if (result && result.catch) result.catch(function () {});
-    } catch (e) {}
+    resumeAudio();
+    markAudible(video);
+    playAndReveal(video, false);
   }
 
-  function playMuted(video) {
-    var retry;
-    video.muted = true;
-    if (soundUnlocked) showSoundChip(false);
-    else showSoundChip(true);
-    try {
-      retry = video.play();
-      if (retry && retry.then) {
-        retry.then(function () { finishArm(video); }).catch(function () { finishArm(video); });
-      } else finishArm(video);
-    } catch (e) { finishArm(video); }
-  }
-
-  function playVideo(video) {
+  function playAndReveal(video, allowMuteFallback) {
     var result;
-    video.muted = false;
-    showSoundChip(false);
     try {
       result = video.play();
-    } catch (e2) {
-      playMuted(video);
+    } catch (e) {
+      if (allowMuteFallback) playMutedThenUnmute(video);
       return;
     }
     if (result && result.then) {
       result.then(function () {
-        finishArm(video);
-        showSoundChip(false);
+        revealVideo(video);
       }).catch(function () {
-        playMuted(video);
+        if (allowMuteFallback) playMutedThenUnmute(video);
       });
       return;
     }
-    finishArm(video);
+    revealVideo(video);
+  }
+
+  function unmuteAfterStart(video) {
+    var attempt = 0;
+    function tick() {
+      var result;
+      if (!wantAudio() || attempt > 5) return;
+      if (video.getAttribute("data-playing") !== "1" || !video.classList.contains("is-active")) return;
+      attempt += 1;
+      resumeAudio();
+      markAudible(video);
+      try {
+        result = video.play();
+      } catch (e) {
+        video.muted = true;
+        window.setTimeout(tick, 400);
+        return;
+      }
+      if (result && result.then) {
+        result.then(function () {
+          if (video.muted) window.setTimeout(tick, 400);
+        }).catch(function () {
+          video.muted = true;
+          var again = video.play();
+          if (again && again.catch) again.catch(function () {});
+          window.setTimeout(tick, 400);
+        });
+      }
+    }
+    tick();
+  }
+
+  function playMutedThenUnmute(video) {
+    var result;
+    video.muted = true;
+    try {
+      result = video.play();
+    } catch (e) {
+      return;
+    }
+    function after() {
+      revealVideo(video);
+      if (wantAudio()) unmuteAfterStart(video);
+    }
+    if (result && result.then) result.then(after).catch(function () {});
+    else after();
+  }
+
+  function playVideo(video) {
+    resumeAudio();
+    if (!wantAudio()) {
+      video.muted = true;
+      playAndReveal(video, false);
+      return;
+    }
+    markAudible(video);
+    playAndReveal(video, true);
   }
 
   function timeMs(value) {
@@ -373,11 +462,20 @@
           node.setAttribute("preload", "auto");
           node.setAttribute("playsinline", "");
           node.setAttribute("webkit-playsinline", "");
-          node.muted = true;
+          node.setAttribute("disableremoteplayback", "");
+          node.setAttribute("poster", SILENT_POSTER);
+          node.controls = false;
+          node.defaultMuted = false;
+          node.muted = false;
+          node.volume = 1;
           node.loop = false;
           videos[ad.id] = node;
           (function (adId, video) {
             video.addEventListener("ended", function () { onEnded(adId); });
+            video.addEventListener("playing", function () { revealVideo(video); });
+            video.addEventListener("timeupdate", function () {
+              if (video.currentTime > 0) revealVideo(video);
+            });
           })(ad.id, node);
         }
         node.setAttribute("data-ad-id", ad.id);
@@ -487,16 +585,11 @@
     var groundNow;
     var command;
     var same;
-    setMode("ad");
     if (image) {
+      setMode("ad");
       document.body.classList.add("mode-image");
-      showSoundChip(false);
-    } else {
-      document.body.classList.remove("mode-image");
-    }
-    hideStills();
-    node = image ? stills[adId] : videos[adId];
-    if (image) {
+      hideStills();
+      node = stills[adId];
       parkOthers(null);
       if (!node) return;
       node.classList.add("is-active");
@@ -504,24 +597,27 @@
       else node.removeAttribute("data-want-play");
       return;
     }
+    node = videos[adId];
     if (!node) return;
     groundNow = findGround(currentDoc);
     command = adId + ":" + (groundNow ? String(timeMs(groundNow.updated_at)) : "");
     same = node.getAttribute("data-command") === command;
-    if (same && node.getAttribute("data-playing") === "1" && node.getAttribute("data-arming") !== "1" && !node.paused && !node.ended && node.readyState >= 2) {
+    if (same && node.getAttribute("data-playing") === "1" && node.classList.contains("is-framed") && !node.paused && !node.ended && node.readyState >= 2) {
       node.classList.add("is-active");
       parkOthers(node);
+      setMode("ad");
       return;
     }
     if (!same) node.removeAttribute("data-retried");
     node.setAttribute("data-command", command);
     node.classList.add("is-active");
+    node.classList.remove("is-framed");
     playFromStart(node);
     if (node.getAttribute("data-retried") === "1") return;
     window.setTimeout(function () {
       if (node.getAttribute("data-command") !== command) return;
       if (node.getAttribute("data-retried") === "1") return;
-      if (!node.paused && !node.ended) {
+      if (node.classList.contains("is-framed") || node.currentTime > 0 || (!node.paused && !node.ended)) {
         finishArm(node);
         return;
       }
