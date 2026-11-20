@@ -134,7 +134,11 @@ Later, a small proxy or Supabase Edge Function can fetch the score server-side a
 
 **Logo Library** is the same pattern for images: name, description, type (Age Group Sponsor, Tournament, CricketCrazeUSA, or Other), preview, list, delete. PNG, WebP, SVG, and JPG are stored as uploaded. JPG shows a note that it has no transparency. A PDF is rendered with pdf.js (page 1) to a PNG preview, and that PNG is what gets saved.
 
-**Ground setup** edits or adds a ground: name, id, short URL, device (YoloBox Pro or YoloBox Mini), CricClubs overlay URL, the three logo pickers, and the ads this game may play. The control view's buttons are only Logos + Score plus that ground's assigned ads. Saving recomputes `resolved_url`.
+**Ground setup** edits or adds a ground: name, id, short URL, device (YoloBox Pro or YoloBox Mini), CricClubs overlay URL, the three logo pickers, and the ads this game may play. The control view's buttons are only Logos + Score plus that ground's assigned ads. Saving recomputes `resolved_url`. **Duplicate ground** copies the logos, layout, ad set, device, and the external-video switch into a new ground with a new id and name. It does not copy score URLs. Set a new score URL, then adjust the age-group logo and tournament logo. Each Command Center card has copyable renderer, SRT, and RTMP links. A score URL that is not `overlay.cricclubs.com` is flagged, because that is the only host allowlisted for embedding.
+
+**Score overlay**, on Ground controls, stores several named CricClubs URLs for one ground (a morning game and an afternoon game). One tap makes a saved entry the live score, or paste a new name and URL and show it immediately. The overlay swaps the score iframe offscreen and leaves the logos where they are.
+
+**External video ad stream (SRT)** is off by default, so a ground keeps playing the video ad in the page. Turn it on when that ground's picture and sound come from `srt://149.28.72.146:8890?streamid=read:<ground id>&latency=500` (fallback `rtmp://149.28.72.146/<ground id>`). A video ad then leaves the overlay fully transparent and returns to Logos + Score after the file's length plus 2.5 seconds. Image ads are unchanged. Step-by-step YoloBox setup is in `docs/ground-setup.md`.
 
 ### Canvas size
 

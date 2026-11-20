@@ -194,6 +194,7 @@
       auto_return: extra.auto_return,
       media_type: extra.media_type || null,
       logo_scale: extra.logo_scale || null,
+      duration_seconds: extra.duration_seconds || null,
       created_at: new Date().toISOString()
     };
     return asset;
@@ -312,6 +313,8 @@
       document.getElementById("st-score").removeAttribute("href");
       setText(localLink, "Overlay pages stay transparent until a ground exists");
       localLink.removeAttribute("href");
+      if (document.getElementById("external-video")) document.getElementById("external-video").disabled = true;
+      if (document.getElementById("score-switch")) document.getElementById("score-switch").classList.add("is-off");
       return;
     }
     setText(document.getElementById("st-name"), ground.name);
@@ -325,6 +328,186 @@
     document.getElementById("st-score").href = window.PulsePlayStore.safeUrl(ground.score_url) || "#";
     localLink.href = "renderer/" + ground.device + ".html?ground=" + encodeURIComponent(ground.id) + "&device=" + ground.device;
     setText(localLink, "Open " + (ground.device === "mini" ? "Mini" : "Pro") + " overlay for this ground");
+    if (document.getElementById("external-video") && document.activeElement !== document.getElementById("external-video")) {
+      document.getElementById("external-video").checked = ground.external_video_audio === true;
+      document.getElementById("external-video").disabled = false;
+    }
+    renderScoreSwitch(ground);
+  }
+
+  function scoreList(ground) {
+    var raw = ground && ground.score_overlays;
+    var out = [];
+    var i;
+    var item;
+    var activeAt = -1;
+    if (raw && raw.length) {
+      for (i = 0; i < raw.length; i++) {
+        item = raw[i];
+        if (!item || !item.url) continue;
+        out.push({
+          id: String(item.id || ((ground.id || "ground") + "-score-" + (i + 1))),
+          name: String(item.name || ("Game " + (out.length + 1))),
+          url: String(item.url).replace(/^\s+|\s+$/g, ""),
+          active: item.active === true
+        });
+      }
+    }
+    if (!out.length && ground && ground.score_url) {
+      out.push({
+        id: (ground.id || "ground") + "-game-1",
+        name: "Game 1",
+        url: ground.score_url,
+        active: true
+      });
+    }
+    for (i = 0; i < out.length; i++) {
+      if (out[i].active && activeAt === -1) activeAt = i;
+      else out[i].active = false;
+    }
+    if (activeAt === -1 && out.length) {
+      for (i = 0; i < out.length; i++) {
+        if (ground && out[i].url === ground.score_url) { activeAt = i; break; }
+      }
+      if (activeAt === -1) activeAt = 0;
+      out[activeAt].active = true;
+    }
+    return out;
+  }
+
+  function scoreWarnText(url) {
+    if (!url || scoreHost(url) === "overlay.cricclubs.com") return "";
+    return "This score URL is not overlay.cricclubs.com. That is the only host this overlay is set up to embed.";
+  }
+
+  var scoreSwitchSig = "";
+
+  function renderScoreSwitch(ground) {
+    var box = document.getElementById("score-switch");
+    var listEl = document.getElementById("score-switch-list");
+    var warn = document.getElementById("score-switch-warn");
+    var list;
+    var sig;
+    var i;
+    var button;
+    var activeUrl = "";
+    if (!box || !listEl) return;
+    if (!ground) {
+      box.classList.add("is-off");
+      scoreSwitchSig = "";
+      return;
+    }
+    box.classList.remove("is-off");
+    list = scoreList(ground);
+    sig = ground.id + "|" + JSON.stringify(list);
+    if (sig !== scoreSwitchSig) {
+      scoreSwitchSig = sig;
+      clear(listEl);
+      for (i = 0; i < list.length; i++) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("data-score-id", list[i].id);
+        button.setAttribute("aria-pressed", list[i].active ? "true" : "false");
+        setText(button, list[i].name);
+        button.onclick = function () { showSavedScore(this.getAttribute("data-score-id")); };
+        listEl.appendChild(button);
+        if (list[i].active) activeUrl = list[i].url;
+      }
+    } else {
+      for (i = 0; i < list.length; i++) if (list[i].active) activeUrl = list[i].url;
+    }
+    var typed = document.getElementById("score-switch-url").value.replace(/^\s+|\s+$/g, "");
+    var warnText = scoreWarnText(typed || activeUrl);
+    setText(warn, warnText);
+    if (warnText) warn.classList.add("is-warn");
+    else warn.classList.remove("is-warn");
+  }
+
+  function freshScoreOverlays(existing, groundId, scoreUrl) {
+    var list;
+    var i;
+    var active = null;
+    if (!existing) {
+      return [{ id: groundId + "-game-1", name: "Game 1", url: scoreUrl, active: true }];
+    }
+    list = scoreList(existing);
+    for (i = 0; i < list.length; i++) if (list[i].active) active = list[i];
+    if (!active && list.length) {
+      list[0].active = true;
+      active = list[0];
+    }
+    if (active) active.url = scoreUrl;
+    else list.push({ id: groundId + "-game-1", name: "Game 1", url: scoreUrl, active: true });
+    return list;
+  }
+
+  function showSavedScore(scoreId) {
+    var ground = findGround(currentDoc, currentId);
+    var list;
+    var i;
+    var chosen = null;
+    if (!ground || !scoreId) return;
+    list = scoreList(ground);
+    for (i = 0; i < list.length; i++) {
+      list[i].active = list[i].id === scoreId;
+      if (list[i].active) chosen = list[i];
+    }
+    if (!chosen) return;
+    /* Leave updated_at alone so an in-flight video return timer still matches. */
+    patch(ground.id, { score_url: chosen.url, score_overlays: list }, { keepUpdatedAt: true });
+  }
+
+  function addScoreOverlay() {
+    var ground = findGround(currentDoc, currentId);
+    var name = document.getElementById("score-switch-name").value.replace(/^\s+|\s+$/g, "");
+    var url = document.getElementById("score-switch-url").value.replace(/^\s+|\s+$/g, "");
+    var list;
+    var i;
+    var id;
+    var taken;
+    var n;
+    var reused = false;
+    if (!ground) return;
+    if (!name || !url) {
+      showBanner("Give the score overlay a name and a URL.");
+      return;
+    }
+    list = scoreList(ground);
+    id = (ground.id || "ground") + "-" + (slug(name) || "score");
+    taken = {};
+    for (i = 0; i < list.length; i++) taken[list[i].id] = true;
+    n = 2;
+    while (taken[id]) {
+      id = (ground.id || "ground") + "-" + (slug(name) || "score") + "-" + n;
+      n += 1;
+    }
+    for (i = 0; i < list.length; i++) {
+      if (list[i].url === url) {
+        list[i].name = name;
+        list[i].active = true;
+        reused = true;
+      } else list[i].active = false;
+    }
+    if (!reused) list.push({ id: id, name: name, url: url, active: true });
+    document.getElementById("score-switch-name").value = "";
+    document.getElementById("score-switch-url").value = "";
+    refreshScoreSwitchDraftWarn();
+    patch(ground.id, { score_url: url, score_overlays: list }, { keepUpdatedAt: true });
+  }
+
+  function refreshScoreSwitchDraftWarn() {
+    var warn = document.getElementById("score-switch-warn");
+    var url = document.getElementById("score-switch-url").value.replace(/^\s+|\s+$/g, "");
+    var text;
+    if (!warn) return;
+    if (!url) {
+      renderScoreSwitch(findGround(currentDoc, currentId));
+      return;
+    }
+    text = scoreWarnText(url);
+    setText(warn, text);
+    if (text) warn.classList.add("is-warn");
+    else warn.classList.remove("is-warn");
   }
 
   function clampPollSeconds(seconds) {
@@ -438,10 +621,110 @@
 
   function isLinkTarget(node) {
     while (node && node !== document) {
-      if (node.tagName === "A") return true;
+      if (node.tagName === "A" || node.tagName === "BUTTON" || node.tagName === "INPUT") return true;
       node = node.parentNode;
     }
     return false;
+  }
+
+  function scoreHost(url) {
+    var anchor = document.createElement("a");
+    anchor.href = url || "";
+    return (anchor.hostname || "").toLowerCase();
+  }
+
+  function refreshScoreWarn() {
+    var box = document.getElementById("field-score-warn");
+    var url = document.getElementById("field-score").value.replace(/^\s+|\s+$/g, "");
+    if (!box) return;
+    if (!url || scoreHost(url) === "overlay.cricclubs.com") {
+      setText(box, "");
+      box.classList.remove("is-warn");
+      return;
+    }
+    setText(box, "This score URL is not overlay.cricclubs.com. That is the only host this overlay is set up to embed.");
+    box.classList.add("is-warn");
+  }
+
+  function copyText(text) {
+    var input;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(function () {});
+      return;
+    }
+    input = document.createElement("input");
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(input);
+  }
+
+  function rendererPageUrl(ground) {
+    var device = ground.device === "mini" ? "mini" : "pro";
+    return "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/" +
+      device + ".html?ground=" + encodeURIComponent(ground.id) + "&device=" + device;
+  }
+
+  function srtPullUrl(id) {
+    return "srt://149.28.72.146:8890?streamid=read:" + id + "&latency=500";
+  }
+
+  function rtmpPullUrl(id) {
+    return "rtmp://149.28.72.146/" + id;
+  }
+
+  function appendCopyLine(card, label, text) {
+    var row = document.createElement("p");
+    var button = document.createElement("button");
+    row.className = "card__pull";
+    row.appendChild(document.createTextNode(label + " " + text + " "));
+    button.type = "button";
+    button.className = "btn-text";
+    setText(button, "Copy");
+    button.onclick = function (event) {
+      if (event.preventDefault) event.preventDefault();
+      if (event.stopPropagation) event.stopPropagation();
+      copyText(text);
+      setText(button, "Copied");
+      window.setTimeout(function () { setText(button, "Copy"); }, 1200);
+    };
+    row.appendChild(button);
+    card.appendChild(row);
+  }
+
+  function duplicateGround() {
+    var source = findGround(currentDoc, document.getElementById("setup-select").value);
+    var name;
+    var id;
+    var n;
+    if (!source) return;
+    name = source.name + " copy";
+    id = slug(name) || "ground-copy";
+    n = 2;
+    while (findGround(currentDoc, id)) {
+      id = slug(name) + "-" + n;
+      n += 1;
+    }
+    showTab("setup");
+    document.getElementById("setup-select").value = "__new__";
+    idTouched = true;
+    loadSetupForm({
+      selection: "__new__",
+      name: name,
+      id: id,
+      idTouched: true,
+      shortLink: "",
+      device: source.device || "pro",
+      score: "",
+      age: source.logos ? source.logos.age_group_sponsor : "",
+      tournament: source.logos ? source.logos.tournament : "",
+      ccusa: source.logos ? source.logos.cricketcraze : "",
+      ads: (source.ad_ids || []).slice(),
+      layout: source.layout || null,
+      external: source.external_video_audio === true
+    });
+    showBanner("Copy of " + source.name + " is ready. Logos, layout, and ads were copied. Set a short URL and a new score URL. Saved score overlays were not copied.");
   }
 
   function childByClass(parent, className) {
@@ -457,6 +740,37 @@
     setText(mode, modeLabel(currentDoc, ground));
     setText(childByClass(card, "card__time"), "Updated " + formatTime(ground.updated_at));
     syncCardStill(card, ground);
+    syncCardScore(card, ground);
+  }
+
+  function syncCardScore(card, ground) {
+    var scoreP = childByClass(card, "card__score");
+    var scoreA = scoreP ? scoreP.getElementsByTagName("a")[0] : null;
+    var slot = childByClass(card, "score-slot");
+    var frame = slot ? slot.getElementsByTagName("iframe")[0] : null;
+    var fallback = childByClass(card, "score-fallback");
+    var link = fallback ? fallback.getElementsByTagName("a")[0] : null;
+    var warn = childByClass(card, "card__hostwarn");
+    var safe = window.PulsePlayStore.safeUrl(ground.score_url) || "#";
+    var text = scoreWarnText(ground.score_url);
+    if (scoreA) {
+      if (scoreA.getAttribute("href") !== safe) scoreA.href = safe;
+      if ((scoreA.textContent || scoreA.innerText) !== ground.score_url) setText(scoreA, ground.score_url);
+    }
+    if (warn) {
+      setText(warn, text);
+      if (text) warn.classList.remove("is-off");
+      else warn.classList.add("is-off");
+    }
+    if (!frame || card.getAttribute("data-score") === ground.score_url) return;
+    card.setAttribute("data-score", ground.score_url);
+    window.PulsePlayScore.attach({
+      iframe: frame,
+      fallback: fallback,
+      link: link,
+      url: ground.score_url,
+      linkLabel: "Open score"
+    });
   }
 
   function syncCardStill(card, ground) {
@@ -541,6 +855,12 @@
     card.appendChild(time);
     card.appendChild(slot);
     card.appendChild(scoreP);
+    appendCopyLine(card, "Renderer:", rendererPageUrl(ground));
+    appendCopyLine(card, "SRT:", srtPullUrl(ground.id));
+    appendCopyLine(card, "RTMP:", rtmpPullUrl(ground.id));
+    var hostWarn = document.createElement("p");
+    hostWarn.className = "card__note card__hostwarn";
+    card.appendChild(hostWarn);
     if (window.PulsePlayStore.isCrossOrigin(ground.score_url)) {
       var note = document.createElement("p");
       note.className = "card__note";
@@ -548,13 +868,6 @@
       card.appendChild(note);
     }
     paintCard(card, ground);
-    window.PulsePlayScore.attach({
-      iframe: iframe,
-      fallback: fallback,
-      link: fallbackLink,
-      url: ground.score_url,
-      linkLabel: "Open score"
-    });
     card.onclick = function (event) {
       if (isLinkTarget(event.target || event.srcElement)) return;
       openGround(ground.id);
@@ -617,7 +930,7 @@
     var item;
     for (i = 0; i < list.length; i++) {
       item = list[i];
-      parts.push(item.id + ":" + item.label + ":" + item.auto_return + ":" + item.logo_type + ":" + (item.media_type || "") + ":" + (item.logo_scale || "") + ":" + item.src);
+      parts.push(item.id + ":" + item.label + ":" + item.auto_return + ":" + item.logo_type + ":" + (item.media_type || "") + ":" + (item.logo_scale || "") + ":" + (item.duration_seconds || "") + ":" + item.src);
     }
     return parts.join("|");
   }
@@ -943,7 +1256,8 @@
       tournament: document.getElementById("pick-tournament").value,
       ccusa: document.getElementById("pick-ccusa").value,
       ads: checkedAdIds(),
-      layout: readLayoutForm()
+      layout: readLayoutForm(),
+      external: document.getElementById("field-external").checked
     };
   }
 
@@ -956,6 +1270,8 @@
     document.getElementById("field-short").value = draft.shortLink;
     document.getElementById("field-device").value = draft.device;
     document.getElementById("field-score").value = draft.score;
+    document.getElementById("field-external").checked = !!draft.external;
+    refreshScoreWarn();
     if (selectHas(document.getElementById("pick-age"), draft.age)) document.getElementById("pick-age").value = draft.age;
     if (selectHas(document.getElementById("pick-tournament"), draft.tournament)) document.getElementById("pick-tournament").value = draft.tournament;
     if (selectHas(document.getElementById("pick-ccusa"), draft.ccusa)) document.getElementById("pick-ccusa").value = draft.ccusa;
@@ -1041,14 +1357,17 @@
     if (!ground) {
       document.getElementById("field-id").readOnly = false;
       document.getElementById("btn-delete-ground").classList.add("is-off");
+      document.getElementById("btn-duplicate-ground").classList.add("is-off");
       if (!draft) {
         document.getElementById("field-name").value = "";
         document.getElementById("field-id").value = "";
         document.getElementById("field-short").value = "";
         document.getElementById("field-device").value = "pro";
         document.getElementById("field-score").value = "";
+        document.getElementById("field-external").checked = false;
         setText(document.getElementById("field-resolved"), "Resolved URL is filled in when you save.");
         writeLayoutForm(null);
+        refreshScoreWarn();
       } else {
         applySetupDraft(draft);
       }
@@ -1057,14 +1376,17 @@
     }
     document.getElementById("field-id").readOnly = true;
     document.getElementById("btn-delete-ground").classList.remove("is-off");
+    document.getElementById("btn-duplicate-ground").classList.remove("is-off");
     if (!draft) {
       document.getElementById("field-name").value = ground.name;
       document.getElementById("field-id").value = ground.id;
       document.getElementById("field-short").value = ground.short_link;
       document.getElementById("field-device").value = ground.device;
       document.getElementById("field-score").value = ground.score_url;
+      document.getElementById("field-external").checked = ground.external_video_audio === true;
       setText(document.getElementById("field-resolved"), "Resolves to " + ground.resolved_url);
       writeLayoutForm(ground.layout);
+      refreshScoreWarn();
     } else {
       applySetupDraft(draft);
     }
@@ -1174,14 +1496,14 @@
     });
   }
 
-  function patch(id, fields) {
+  function patch(id, fields, opts) {
     var ground = findGround(currentDoc, id);
     var key;
     if (!ground) return;
     for (key in fields) {
       if (fields.hasOwnProperty(key)) ground[key] = fields[key];
     }
-    ground.updated_at = new Date().toISOString();
+    if (!opts || !opts.keepUpdatedAt) ground.updated_at = new Date().toISOString();
     saveDoc("Saved " + ground.name + " at " + formatTime(ground.updated_at) + ". The overlay follows within about 2 seconds, often sooner in this browser.");
   }
 
@@ -1275,12 +1597,14 @@
     ground.device = device;
     ground.resolved_url = resolvedFor(id, device);
     ground.score_url = scoreUrl;
+    ground.score_overlays = freshScoreOverlays(existing, id, scoreUrl);
     ground.logos = {
       age_group_sponsor: document.getElementById("pick-age").value,
       tournament: document.getElementById("pick-tournament").value,
       cricketcraze: document.getElementById("pick-ccusa").value
     };
     ground.layout = window.PulsePlayLayout.isDefault(readLayoutForm()) ? null : readLayoutForm();
+    ground.external_video_audio = document.getElementById("field-external").checked;
     ground.ad_ids = adIds;
     if (ground.active_ad && indexOf(adIds, ground.active_ad) === -1) {
       ground.mode = "logos_score";
@@ -1450,18 +1774,86 @@
     if (upload.error) { showBanner(upload.error); return; }
     try { upload.file.adFolder = "ads"; } catch (e) {}
     id = "upload-" + new Date().getTime();
+    readVideoDuration(upload.image ? null : upload.file, function (seconds) {
     store.putBlob(id, upload.file, function (err, info) {
       if (err) { showBanner(err.message || "Upload failed."); return; }
       currentDoc.assets.push(assetFromUpload(id, "ad", label, description, info, upload.file, {
         auto_return: upload.image ? null : true,
         logo_type: null,
-        media_type: upload.image ? "image" : "video"
+        media_type: upload.image ? "image" : "video",
+        duration_seconds: seconds
       }));
       clearAdForm();
       librarySig = "";
       setupSig = null;
       actionSig = "";
       saveDoc("Added " + label + " to the library. Assign it to a ground before it can go on air.");
+    });
+    });
+  }
+
+  function readVideoDurationFromUrl(url, revoke, callback) {
+    var video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = function () {
+      var seconds = video.duration;
+      if (revoke) URL.revokeObjectURL(url);
+      callback(isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) / 1000 : null);
+    };
+    video.onerror = function () {
+      if (revoke) URL.revokeObjectURL(url);
+      callback(null);
+    };
+    video.src = url;
+  }
+
+  function readVideoDuration(file, callback) {
+    if (!file) { callback(null); return; }
+    readVideoDurationFromUrl(URL.createObjectURL(file), true, callback);
+  }
+
+  var durationBackfillStarted = false;
+
+  function backfillMissingDurations() {
+    var ids = [];
+    var i;
+    var asset;
+    if (durationBackfillStarted || !currentDoc || !currentDoc.assets) return;
+    durationBackfillStarted = true;
+    for (i = 0; i < currentDoc.assets.length; i++) {
+      asset = currentDoc.assets[i];
+      if (asset.kind === "ad" && asset.media_type !== "image" && !(Number(asset.duration_seconds) > 0)) {
+        ids.push(asset.id);
+      }
+    }
+    if (ids.length) probeDurationQueue(ids, 0, false);
+  }
+
+  function probeDurationQueue(ids, index, changed) {
+    var asset;
+    if (!currentDoc) return;
+    if (index >= ids.length) {
+      if (changed) saveDoc("Saved video lengths for ads that were missing one.");
+      return;
+    }
+    asset = findAsset(currentDoc, ids[index]);
+    if (!asset || Number(asset.duration_seconds) > 0 || !asset.src) {
+      probeDurationQueue(ids, index + 1, changed);
+      return;
+    }
+    store.mediaUrl(asset.src, function (err, url) {
+      if (err || !url) {
+        probeDurationQueue(ids, index + 1, changed);
+        return;
+      }
+      readVideoDurationFromUrl(url, false, function (seconds) {
+        var live = currentDoc ? findAsset(currentDoc, ids[index]) : null;
+        if (live && !(Number(live.duration_seconds) > 0) && seconds) {
+          live.duration_seconds = seconds;
+          changed = true;
+        }
+        probeDurationQueue(ids, index + 1, changed);
+      });
     });
   }
 
@@ -1594,6 +1986,14 @@
   document.getElementById("poll-seconds").onchange = function () {
     savePollSeconds(this.value);
   };
+  document.getElementById("external-video").onchange = function () {
+    if (!currentId) return;
+    patch(currentId, { external_video_audio: this.checked });
+  };
+  document.getElementById("score-switch-save").onclick = addScoreOverlay;
+  document.getElementById("score-switch-url").oninput = refreshScoreSwitchDraftWarn;
+  document.getElementById("field-score").oninput = refreshScoreWarn;
+  document.getElementById("btn-duplicate-ground").onclick = duplicateGround;
   (function wirePollPicks() {
     var buttons = document.getElementById("poll-picks").getElementsByTagName("button");
     var i;
@@ -1698,6 +2098,7 @@
       currentDoc = doc;
       currentId = doc.grounds[0] ? doc.grounds[0].id : "";
       renderAll();
+      backfillMissingDurations();
     });
     store.subscribe(function (err, doc) {
       if (err || !doc) return;

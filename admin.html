@@ -89,6 +89,19 @@
         </div>
       </div>
       <p class="hint" id="poll-hint">The overlay listens for Supabase Realtime on grounds, so a Logos + Score or ad switch usually shows up right away. If that live update is missed, the YoloBox waits for the next poll, which can take as long as this interval.</p>
+      <label class="check"><input type="checkbox" id="external-video"> External video ad stream (SRT)</label>
+      <p class="hint">When this is on, a video ad leaves this page transparent so the SRT picture shows through, and the logos return after the ad's length plus 2.5 seconds.</p>
+      <div id="score-switch" class="score-switch">
+        <p class="k">Score overlay</p>
+        <p class="hint">Save each game's CricClubs overlay. One tap shows that score. Logos, ads, and layout stay as they are.</p>
+        <div id="score-switch-list" class="actions"></div>
+        <p class="hint" id="score-switch-warn"></p>
+        <div class="score-switch-add">
+          <label>Name <input id="score-switch-name" type="text" placeholder="Game 2 – U13 vs Y"></label>
+          <label>URL <input id="score-switch-url" type="text" placeholder="https://overlay.cricclubs.com/…"></label>
+          <button type="button" id="score-switch-save">Save and show</button>
+        </div>
+      </div>
       <p class="hint"><a id="local-overlay" href="renderer/pro.html" target="_blank" rel="noopener">Open overlay</a></p>
       <div id="action-bar" class="actions" aria-label="Overlay actions"></div>
       <p class="hint" id="save-hint">View changes write immediately. The overlay applies them on the storage event, or on the next poll if that event is missed.</p>
@@ -169,7 +182,10 @@
           </select>
         </label>
         <label>CricClubs overlay URL <input id="field-score" type="text" required></label>
+        <p class="hint" id="field-score-warn"></p>
         <p class="hint" id="field-resolved"></p>
+        <label class="check"><input type="checkbox" id="field-external"> External video ad stream (SRT)</label>
+        <p class="hint">When this is on, a video ad leaves this page transparent so the SRT picture shows through, and the logos return after the ad's length plus 2.5 seconds.</p>
 
         <div class="logo-fields">
           <div>
@@ -212,6 +228,7 @@
         </fieldset>
 
         <button type="submit">Save ground</button>
+        <button type="button" id="btn-duplicate-ground">Duplicate ground</button>
         <button type="button" id="btn-delete-ground" class="btn-danger">Delete ground</button>
       </form>
     </section>

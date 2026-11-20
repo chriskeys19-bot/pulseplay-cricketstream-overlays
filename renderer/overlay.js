@@ -15,6 +15,10 @@
   var SILENT_POSTER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   var shownKey = "";
   var appliedSig = "";
+  var placedKey = "";
+  var externalTimer = null;
+  var externalToken = 0;
+  var externalSent = "";
   var returnHold = null;
   var returnTimer = null;
   var pollMs = window.PulsePlayStore.DEFAULT_POLL_MS;
@@ -460,8 +464,68 @@
     }
   }
 
+  function clearExternalTimer() {
+    externalToken += 1;
+    if (externalTimer) {
+      window.clearTimeout(externalTimer);
+      externalTimer = null;
+    }
+  }
+
+  function externalVideo(doc, ground) {
+    var ad;
+    if (!ground || ground.external_video_audio !== true) return false;
+    if (ground.mode !== "ad" || !ground.active_ad) return false;
+    ad = findAd(doc, ground.active_ad);
+    return !!(ad && !isImageAd(ad));
+  }
+
+  function showExternal(adId) {
+    var ad = findAd(currentDoc, adId);
+    var ground = findGround(currentDoc);
+    var seconds;
+    var seenAt;
+    var token;
+    var key;
+    clearExternalTimer();
+    document.body.classList.add("mode-external");
+    document.body.classList.remove("mode-image");
+    setMode("ad");
+    hideStills();
+    parkOthers(null);
+    if (!ad || !isFinite(Number(ad.duration_seconds)) || Number(ad.duration_seconds) <= 0) {
+      if (window.console && console.log) console.log("Pulse Play external video has no duration");
+      return;
+    }
+    seconds = Number(ad.duration_seconds) + 2.5;
+    seenAt = ground ? ground.updated_at : "";
+    key = adId + "@" + String(seenAt || "");
+    token = externalToken;
+    externalTimer = window.setTimeout(function () {
+      var live;
+      if (token !== externalToken) return;
+      if (!currentDoc) return;
+      live = findGround(currentDoc);
+      if (!live || live.external_video_audio !== true) return;
+      if (live.mode !== "ad" || live.active_ad !== adId) return;
+      if (String(live.updated_at || "") !== String(seenAt || "")) return;
+      if (externalSent === key) return;
+      externalSent = key;
+      live.mode = "logos_score";
+      live.active_ad = null;
+      appliedSig = "";
+      shownKey = "";
+      document.body.classList.remove("mode-external");
+      apply(currentDoc);
+      if (store.returnToLogos) store.returnToLogos(live.id, adId, seenAt, function () {});
+      else if (store.write) store.write(currentDoc, function () {});
+    }, Math.round(seconds * 1000));
+  }
+
   function showLogos() {
     var key;
+    clearExternalTimer();
+    document.body.classList.remove("mode-external");
     document.body.classList.remove("mode-image");
     setMode("logos");
     hideStills();
@@ -475,6 +539,8 @@
     var image = isImageAd(ad);
     var node;
     if (image) {
+      clearExternalTimer();
+      document.body.classList.remove("mode-external");
       setMode("ad");
       document.body.classList.add("mode-image");
       hideStills();
@@ -488,6 +554,8 @@
     }
     node = videos[adId];
     if (!node) return;
+    clearExternalTimer();
+    document.body.classList.remove("mode-external");
     setMode("ad");
     document.body.classList.remove("mode-image");
     hideStills();
@@ -519,6 +587,11 @@
       logoPart(doc, logos.tournament),
       logoPart(doc, logos.cricketcraze),
       ground ? (ground.score_url || "") : "",
+      ground && ground.external_video_audio ? "1" : "0",
+      (function () {
+        var ad = ground ? findAd(doc, ground.active_ad) : null;
+        return ad && ad.duration_seconds != null ? String(ad.duration_seconds) : "";
+      })(),
       JSON.stringify(ground ? (ground.layout || null) : null)
     ].join("|");
   }
@@ -529,6 +602,7 @@
     var nextPoll;
     var sig;
     var nextKey;
+    var nextPlace;
     currentDoc = doc;
     ground = findGround(doc);
     if (!groundId || !ground) {
@@ -559,7 +633,15 @@
     setLogo("logo-age", assetSrc(doc, logos.age_group_sponsor));
     setLogo("logo-tournament", assetSrc(doc, logos.tournament));
     setLogo("logo-ccusa", assetSrc(doc, logos.cricketcraze));
-    if (window.PulsePlayLayout) {
+    nextPlace = [
+      document.body.getAttribute("data-device") || "",
+      logoScaleFor(doc, logos.age_group_sponsor),
+      logoScaleFor(doc, logos.tournament),
+      logoScaleFor(doc, logos.cricketcraze),
+      JSON.stringify(ground.layout || null)
+    ].join("|");
+    if (nextPlace !== placedKey && window.PulsePlayLayout) {
+      placedKey = nextPlace;
       window.PulsePlayLayout.place({
         device: document.body.getAttribute("data-device"),
         layout: ground.layout,
@@ -582,11 +664,19 @@
       pollMs = nextPoll;
       schedule();
     }
-    nextKey = ground.mode === "ad" && ground.active_ad ? "ad:" + ground.active_ad : "logos";
-    if (nextKey === shownKey) return;
-    ensureAds(doc, ground);
+    if (externalVideo(doc, ground)) nextKey = "ext:" + ground.active_ad;
+    else if (ground.mode === "ad" && ground.active_ad) nextKey = "ad:" + ground.active_ad;
+    else nextKey = "logos";
+    if (nextKey === shownKey) {
+      /* A duration that arrives after the transparent ad started still
+         needs its return timer. A timer that is already running stays. */
+      if (nextKey.indexOf("ext:") === 0 && !externalTimer) showExternal(ground.active_ad);
+      return;
+    }
+    if (nextKey.indexOf("ext:") !== 0) ensureAds(doc, ground);
     shownKey = nextKey;
     if (nextKey === "logos") showLogos();
+    else if (nextKey.indexOf("ext:") === 0) showExternal(ground.active_ad);
     else showAd(ground.active_ad);
   }
 

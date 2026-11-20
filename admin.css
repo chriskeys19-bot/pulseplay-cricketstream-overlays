@@ -188,6 +188,13 @@ input[type="number"] { width: 120px; min-width: 120px; }
 }
 .score-fallback { margin: 0; padding: 12px; background: #2a2416; color: #f6f3ea; font-size: 14px; }
 .card__note { margin: 8px 0 0; font-size: 13px; }
+.card__pull { margin: 8px 0 0; font-size: 13px; word-break: break-all; }
+.card__pull button { margin-left: 8px; }
+.hint.is-warn { color: #e4b75a; }
+.score-switch { margin: 16px 0; padding-top: 8px; border-top: 1px solid #31402d; }
+.score-switch .k { margin: 0; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: #e4b75a; }
+.score-switch-add label { display: block; margin: 8px 0; }
+.score-switch-add input { display: block; width: 100%; max-width: 640px; margin-top: 4px; }
 .logo-fields { margin: 8px 0 16px; }
 .logo-fields > div {
   display: inline-block;
