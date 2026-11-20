@@ -147,6 +147,10 @@
           "description": "CricClubs overlay URL for this ground. The renderer and Command Center both iframe this field."
         },
         "logos": { "$ref": "#/definitions/logos" },
+        "play_audio": {
+          "type": "boolean",
+          "description": "When true, video ads try to play with sound. When false, they stay muted. Omit it to keep sound on."
+        },
         "layout": {
           "type": ["object", "null"],
           "description": "Optional per-slot scale (0.25 to 2) and x/y nudge in stage pixels. Null uses the device base sizes.",
