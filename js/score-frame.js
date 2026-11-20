@@ -34,70 +34,83 @@
     }
   }
 
+  function decorate(frame) {
+    frame.setAttribute("title", "Match score");
+    frame.setAttribute("scrolling", "no");
+    frame.setAttribute("referrerpolicy", "no-referrer");
+    frame.setAttribute("allowtransparency", "true");
+    if (frame.style.backgroundColor !== "transparent") frame.style.backgroundColor = "transparent";
+  }
+
   function attach(opts) {
     var iframe = opts.iframe;
     var fallback = opts.fallback;
     var link = opts.link;
     var url = opts.url;
     var linkLabel = opts.linkLabel || "Open score";
-    var safe;
-    var settled;
+    var safe = iframe ? store.safeUrl(url) : "";
+    var key = safe || "";
+    var blocked = !safe || store.hostBlocksEmbed(url);
+    var token = blocked ? "blocked" : key;
+    var ghost;
 
     if (!iframe) return;
-    iframe.setAttribute("allowtransparency", "true");
-    iframe.style.backgroundColor = "transparent";
-    safe = store.safeUrl(url);
+    if ((iframe.getAttribute("data-current") || "") === token) return;
+    if ((iframe.getAttribute("data-pending") || "") === token) return;
 
-    if (link) {
+    if (link && link.getAttribute("href") !== (safe || "#")) {
       link.href = safe || "#";
       link.target = "_blank";
       link.rel = "noopener";
       setText(link, linkLabel);
     }
 
-    if (!safe || store.hostBlocksEmbed(url)) {
-      iframe.setAttribute("data-current", "");
-      iframe.src = "about:blank";
+    if (blocked) {
+      iframe.setAttribute("data-current", "blocked");
+      iframe.removeAttribute("data-pending");
+      if (iframe.getAttribute("src") && iframe.getAttribute("src") !== "about:blank") iframe.src = "about:blank";
       show(iframe, false);
       show(fallback, true);
       return;
     }
 
-    if (iframe.getAttribute("data-current") === safe) return;
-    iframe.setAttribute("data-current", safe);
-    settled = false;
-
-    function succeed() {
-      if (settled) return;
-      settled = true;
-      show(iframe, true);
+    iframe.setAttribute("data-pending", token);
+    ghost = document.createElement("iframe");
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.style.cssText = "position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;opacity:0;";
+    ghost.onload = function () {
+      var live;
+      ghost.onload = null;
+      ghost.onerror = null;
+      live = document.getElementById(iframe.id) || iframe;
+      if (!live.parentNode || live.getAttribute("data-pending") !== token) {
+        if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+        return;
+      }
+      ghost.id = live.id;
+      ghost.removeAttribute("aria-hidden");
+      ghost.removeAttribute("style");
+      decorate(ghost);
+      ghost.setAttribute("data-current", token);
+      ghost.removeAttribute("data-pending");
+      live.parentNode.replaceChild(ghost, live);
+      show(ghost, true);
       show(fallback, false);
-    }
-
-    function fail() {
-      if (settled) return;
-      settled = true;
-      show(iframe, false);
-      show(fallback, true);
-      iframe.src = "about:blank";
-    }
-
-    iframe.onload = function () {
-      if (looksLive(iframe)) succeed();
     };
-    iframe.onerror = function () {
-      fail();
+    ghost.onerror = function () {
+      var live;
+      if (ghost.id === "score-frame") return;
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      live = document.getElementById(iframe.id);
+      if (!live || (live.getAttribute("data-pending") || "") !== token) return;
+      live.setAttribute("data-current", token);
+      live.removeAttribute("data-pending");
+      if (live.getAttribute("src") !== safe) live.src = safe;
+      show(live, true);
+      show(fallback, false);
     };
-
-    show(fallback, false);
-    show(iframe, true);
-    iframe.src = safe;
-
-    global.setTimeout(function () {
-      if (settled) return;
-      if (looksLive(iframe)) succeed();
-      else fail();
-    }, 5000);
+    document.body.appendChild(ghost);
+    ghost.src = safe;
   }
 
   global.PulsePlayScore = { attach: attach };
