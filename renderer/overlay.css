@@ -64,6 +64,20 @@ body.mode-ad #view-ad { opacity: 1; }
 }
 #ad-slots img.is-active { opacity: 1; }
 body.mode-image #view-ad { background: #000; }
+body.mode-external,
+body.mode-external #stage,
+body.mode-external #view-ad,
+body.mode-external #view-logos {
+  background: transparent !important;
+}
+body.mode-external #view-logos {
+  opacity: 0 !important;
+}
+body.mode-external #score-slot,
+body.mode-external #ad-slots,
+body.mode-external #overlay-status {
+  visibility: hidden !important;
+}
 .logo { display: block; object-fit: contain; }
 .logo-age { object-position: left top; }
 .logo-tournament { object-position: left bottom; }

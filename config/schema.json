@@ -64,6 +64,10 @@
           ],
           "description": "Ads only. image stays on screen until switched. video always returns to Logos + Score when it finishes."
         },
+        "duration_seconds": {
+          "type": ["number", "null"],
+          "description": "Video ads only. Length in seconds, read from the file when it is uploaded."
+        },
         "logo_scale": {
           "type": ["number", "null"],
           "minimum": 0.25,
@@ -144,9 +148,28 @@
         "score_url": {
           "type": "string",
           "minLength": 1,
-          "description": "CricClubs overlay URL for this ground. The renderer and Command Center both iframe this field."
+          "description": "CricClubs overlay URL currently on air. The renderer and Command Center both iframe this field. It matches the active entry in score_overlays."
+        },
+        "score_overlays": {
+          "type": "array",
+          "description": "Named score URLs for this ground. One tap in Ground controls marks one active and copies its url into score_url.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "url", "active"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "url": { "type": "string", "minLength": 1 },
+              "active": { "type": "boolean" }
+            }
+          }
         },
         "logos": { "$ref": "#/definitions/logos" },
+        "external_video_audio": {
+          "type": "boolean",
+          "description": "When true, a video ad leaves the web overlay transparent so an external SRT stream can show the picture and the sound."
+        },
         "play_audio": {
           "type": "boolean",
           "description": "When true, video ads try to play with sound. When false, they stay muted. Omit it to keep sound on."

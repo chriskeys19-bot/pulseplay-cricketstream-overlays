@@ -212,6 +212,7 @@
           auto_return: row.auto_return,
           media_type: row.kind === "ad" ? (row.media_type === "image" ? "image" : "video") : null,
           logo_scale: row.kind === "logo" && row.logo_scale != null ? Number(row.logo_scale) : null,
+          duration_seconds: row.kind === "ad" && row.duration_seconds != null ? Number(row.duration_seconds) : null,
           created_at: row.created_at
         });
       }
@@ -233,6 +234,8 @@
           },
           ad_ids: [],
           layout: row.layout || null,
+          external_video_audio: row.external_video_audio === true,
+          score_overlays: row.score_overlays || [],
           updated_at: row.updated_at
         };
         byGround[ground.id] = ground;
@@ -312,6 +315,7 @@
             media_type: asset.kind === "ad" ? (asset.media_type === "image" ? "image" : "video") : null,
             auto_return: asset.kind === "ad" && asset.media_type !== "image" ? asset.auto_return !== false : null,
             logo_scale: asset.kind === "logo" && asset.logo_scale != null ? asset.logo_scale : null,
+            duration_seconds: asset.kind === "ad" && asset.duration_seconds != null ? asset.duration_seconds : null,
             created_at: asset.created_at
           });
         }
@@ -331,6 +335,8 @@
             mode: ground.mode || "logos_score",
             active_ad_id: emptyToNull(ground.active_ad),
             layout: ground.layout || null,
+            external_video_audio: ground.external_video_audio === true,
+            score_overlays: ground.score_overlays || [],
             updated_at: ground.updated_at
           });
           for (j = 0; j < (ground.ad_ids || []).length; j++) {
