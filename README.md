@@ -221,6 +221,7 @@ Once the first deploy finishes:
 - <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/admin.html>
 - <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=cheetahs-home&device=pro>
 - <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/mini.html?ground=cheetahs-home-mini&device=mini>
+- <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/audiotest.html>
 
 Pages publishes `main` only, so this pull request does not change a live overlay. The admin page sends `noindex`. It still only changes the visitor's own browser.
 

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pulse Play audio test</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: #07140c;
+      color: #f6f3ea;
+      font: 700 36px/1.25 Arial, Helvetica, sans-serif;
+      padding: 36px 40px 48px;
+    }
+    body.is-transparent { background: transparent; }
+    h1 { margin: 0 0 8px; font-size: 72px; line-height: 1.05; }
+    .now { margin: 0 0 18px; font-size: 56px; color: #e4b75a; }
+    .line { margin: 0 0 10px; font-size: 40px; }
+    #board { margin: 18px 0; font-size: 34px; white-space: pre-wrap; }
+    #ua { margin: 18px 0 0; font-size: 26px; font-weight: 400; word-break: break-word; }
+    button {
+      margin-top: 28px;
+      padding: 28px 48px;
+      font: 700 48px/1 Arial, Helvetica, sans-serif;
+      background: #e4b75a;
+      color: #07140c;
+      border: 0;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    video, audio { position: absolute; width: 320px; height: 180px; left: 40px; bottom: 40px; }
+  </style>
+</head>
+<body>
+  <h1>Audio test</h1>
+  <p class="now" id="now">Starting…</p>
+  <p class="line" id="play">play(): —</p>
+  <p class="line" id="ctx">audioContext.state: —</p>
+  <p class="line" id="media">muted — · volume — · paused —</p>
+  <p id="board"></p>
+  <p id="ua"></p>
+  <button type="button" id="tap">Tap to test</button>
+  <audio id="tone-mp3" src="../assets/audio/tone.mp3" preload="auto" playsinline></audio>
+  <audio id="tone-m4a" src="../assets/audio/tone.m4a" preload="auto" playsinline></audio>
+  <video id="vid-open" src="../assets/ads/ad1.mp4" preload="auto" playsinline webkit-playsinline></video>
+  <video id="vid-mute" src="../assets/ads/ad1.mp4" preload="auto" playsinline webkit-playsinline></video>
+  <script>
+    (function () {
+      var HOLD_MS = 4000;
+      var ctx = null;
+      var osc = null;
+      var gain = null;
+      var timer = null;
+      var step = 0;
+      var playToken = 0;
+      var active = null;
+      var results = {};
+      var mp3 = document.getElementById("tone-mp3");
+      var m4a = document.getElementById("tone-m4a");
+      var vidOpen = document.getElementById("vid-open");
+      var vidMute = document.getElementById("vid-mute");
+      var tests = [
+        { id: "A", label: "A · WebAudio 440 Hz", start: startOsc },
+        { id: "Bmp3", label: "B · audio MP3", start: function () { startEl(mp3, false, null); } },
+        { id: "Bm4a", label: "B · audio M4A", start: function () { startEl(m4a, false, null); } },
+        { id: "C", label: "C · video unmuted", start: function () { startEl(vidOpen, false, null); } },
+        { id: "D", label: "D · video muted, then unmute", start: function () { startEl(vidMute, true, unmuteAfterPlaying); } }
+      ];
+
+      if (window.location.search.indexOf("transparent=1") !== -1) {
+        document.body.className = "is-transparent";
+      }
+      document.getElementById("ua").textContent = navigator.userAgent || "";
+
+      function setText(id, text) {
+        var node = document.getElementById(id);
+        if (node) node.textContent = text;
+      }
+
+      function paintBoard() {
+        var lines = [];
+        var i;
+        var row;
+        for (i = 0; i < tests.length; i++) {
+          row = results[tests[i].id];
+          lines.push(tests[i].label + ": " + (row || "…"));
+        }
+        setText("board", lines.join("\n"));
+      }
+
+      function note(id, text) {
+        results[id] = text;
+        paintBoard();
+      }
+
+      function contextState() {
+        if (!ctx) return "none";
+        return ctx.state || "unknown";
+      }
+
+      function mediaLine() {
+        if (!active) return "muted — · volume — · paused —";
+        return "muted " + String(!!active.muted) +
+          " · volume " + String(active.volume) +
+          " · paused " + String(!!active.paused);
+      }
+
+      function paintLive() {
+        setText("ctx", "audioContext.state: " + contextState());
+        setText("media", mediaLine());
+      }
+
+      function stopAll() {
+        var list = [mp3, m4a, vidOpen, vidMute];
+        var i;
+        if (osc) {
+          try { osc.stop(); } catch (e) {}
+          osc = null;
+        }
+        if (gain) {
+          try { gain.disconnect(); } catch (e2) {}
+          gain = null;
+        }
+        for (i = 0; i < list.length; i++) {
+          try { list[i].pause(); } catch (e3) {}
+        }
+        active = null;
+      }
+
+      function ensureContext() {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        var pending;
+        if (!AC) return null;
+        if (!ctx) ctx = new AC();
+        if (ctx.resume) {
+          try {
+            pending = ctx.resume();
+            if (pending && pending.catch) pending.catch(function () {});
+          } catch (e) {}
+        }
+        return ctx;
+      }
+
+      function recordPlay(id, outcome, name) {
+        var text = outcome;
+        if (name) text += " " + name;
+        note(id, text);
+        setText("play", "play(): " + text);
+      }
+
+      function startOsc() {
+        var audio;
+        active = null;
+        audio = ensureContext();
+        if (!audio) {
+          recordPlay("A", "rejected", "NoAudioContext");
+          return;
+        }
+        try {
+          osc = audio.createOscillator();
+          gain = audio.createGain();
+          osc.frequency.value = 440;
+          gain.gain.value = 0.2;
+          osc.connect(gain);
+          gain.connect(audio.destination);
+          osc.start();
+          recordPlay("A", "started", "oscillator");
+        } catch (err) {
+          recordPlay("A", "rejected", err && err.name ? err.name : "Error");
+        }
+      }
+
+      function startEl(el, muted, afterPlaying) {
+        var result;
+        var id = currentId();
+        var token;
+        playToken += 1;
+        token = playToken;
+        active = el;
+        try { el.pause(); } catch (e) {}
+        try { el.currentTime = 0; } catch (e2) {}
+        el.muted = !!muted;
+        el.volume = 1;
+        if (afterPlaying) {
+          el.onplaying = function () {
+            if (token !== playToken) return;
+            afterPlaying(el);
+          };
+        } else {
+          el.onplaying = null;
+        }
+        try {
+          result = el.play();
+        } catch (err) {
+          recordPlay(id, "rejected", err && err.name ? err.name : "Error");
+          return;
+        }
+        if (result && result.then) {
+          result.then(function () {
+            recordPlay(id, "resolved", "");
+          }).catch(function (err2) {
+            recordPlay(id, "rejected", err2 && err2.name ? err2.name : "Error");
+          });
+          return;
+        }
+        recordPlay(id, "resolved", "");
+      }
+
+      function unmuteAfterPlaying(el) {
+        el.muted = false;
+        el.volume = 1;
+        note("D", (results.D || "resolved") + " · unmuted=" + String(!el.muted));
+        setText("play", "play(): " + (results.D || ""));
+      }
+
+      function currentId() {
+        var test = tests[(step - 1) % tests.length];
+        return test ? test.id : "";
+      }
+
+      function runStep() {
+        var test;
+        stopAll();
+        test = tests[step % tests.length];
+        step += 1;
+        setText("now", test.label);
+        setText("play", "play(): …");
+        test.start();
+        paintLive();
+        timer = window.setTimeout(runStep, HOLD_MS);
+      }
+
+      function prime(done) {
+        var list = [mp3, m4a, vidOpen, vidMute];
+        var i;
+        ensureContext();
+        for (i = 0; i < list.length; i++) {
+          try {
+            var result = list[i].play();
+            if (result && result.catch) result.catch(function () {});
+            list[i].pause();
+          } catch (e) {}
+        }
+        if (done) done();
+      }
+
+      document.getElementById("tap").onclick = function () {
+        if (timer) window.clearTimeout(timer);
+        step = 0;
+        prime(function () {
+          runStep();
+        });
+      };
+
+      window.setInterval(paintLive, 250);
+      paintBoard();
+      runStep();
+    })();
+  </script>
+</body>
+</html>
