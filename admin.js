@@ -312,7 +312,6 @@
       document.getElementById("st-score").removeAttribute("href");
       setText(localLink, "Overlay pages stay transparent until a ground exists");
       localLink.removeAttribute("href");
-      if (document.getElementById("play-audio")) document.getElementById("play-audio").disabled = true;
       return;
     }
     setText(document.getElementById("st-name"), ground.name);
@@ -326,12 +325,6 @@
     document.getElementById("st-score").href = window.PulsePlayStore.safeUrl(ground.score_url) || "#";
     localLink.href = "renderer/" + ground.device + ".html?ground=" + encodeURIComponent(ground.id) + "&device=" + ground.device;
     setText(localLink, "Open " + (ground.device === "mini" ? "Mini" : "Pro") + " overlay for this ground");
-    if (document.getElementById("play-audio")) {
-      document.getElementById("play-audio").disabled = false;
-      if (document.activeElement !== document.getElementById("play-audio")) {
-        document.getElementById("play-audio").checked = ground.play_audio !== false;
-      }
-    }
   }
 
   function clampPollSeconds(seconds) {
@@ -1600,10 +1593,6 @@
   };
   document.getElementById("poll-seconds").onchange = function () {
     savePollSeconds(this.value);
-  };
-  document.getElementById("play-audio").onchange = function () {
-    if (!currentId) return;
-    patch(currentId, { play_audio: this.checked });
   };
   (function wirePollPicks() {
     var buttons = document.getElementById("poll-picks").getElementsByTagName("button");

@@ -12,9 +12,9 @@
   var videos = {};
   var stills = {};
   var currentDoc = null;
-  var soundUnlocked = false;
-  var audioCtx = null;
   var SILENT_POSTER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  var shownKey = "";
+  var appliedSig = "";
   var returnHold = null;
   var returnTimer = null;
   var pollMs = window.PulsePlayStore.DEFAULT_POLL_MS;
@@ -59,7 +59,7 @@
 
   function hideStatus() {
     var box = document.getElementById("overlay-status");
-    if (box) box.classList.add("is-off");
+    if (box && !box.classList.contains("is-off")) box.classList.add("is-off");
   }
 
   function findGround(doc) {
@@ -123,17 +123,33 @@
     var img = document.getElementById(id);
     if (!img) return;
     if (!src) {
+      if (!img.getAttribute("data-src") && img.classList.contains("is-off")) return;
       img.classList.add("is-off");
       img.removeAttribute("data-src");
+      if (img.getAttribute("src")) img.removeAttribute("src");
       return;
     }
-    img.classList.remove("is-off");
-    if (img.getAttribute("data-src") === src) return;
-    img.setAttribute("data-src", src);
+    if (img.getAttribute("data-src") === src || img.getAttribute("data-pending") === src) return;
+    img.setAttribute("data-pending", src);
     store.mediaUrl(src, function (err, url) {
+      var pre;
       if (err || !url) return;
-      if (img.getAttribute("data-src") !== src) return;
-      img.src = url;
+      if (img.getAttribute("data-pending") !== src) return;
+      if (img.getAttribute("src") === url) {
+        img.setAttribute("data-src", src);
+        img.removeAttribute("data-pending");
+        if (img.classList.contains("is-off")) img.classList.remove("is-off");
+        return;
+      }
+      pre = new Image();
+      pre.onload = function () {
+        if (img.getAttribute("data-pending") !== src) return;
+        img.src = url;
+        img.setAttribute("data-src", src);
+        img.removeAttribute("data-pending");
+        if (img.classList.contains("is-off")) img.classList.remove("is-off");
+      };
+      pre.src = url;
     });
   }
 
@@ -160,8 +176,8 @@
     if (url) video.setAttribute("data-resolved", url);
     video.classList.remove("is-active");
     video.classList.remove("is-framed");
-    video.muted = true;
     video.removeAttribute("data-playing");
+    video.removeAttribute("data-command");
     video.removeAttribute("data-want-play");
     if (!video.getAttribute("src") && !video.currentSrc) return;
     try { video.pause(); } catch (e) {}
@@ -181,173 +197,49 @@
     if (video) video.removeAttribute("data-arming");
   }
 
-  function playFromStart(video) {
-    var url = video.getAttribute("data-resolved") || video.currentSrc || video.src || "";
+  function revealOnce(video) {
+    if (!video || video.getAttribute("data-seen") === "1") return;
+    if (video.getAttribute("data-playing") !== "1") return;
+    if (!video.classList.contains("is-active")) return;
+    video.setAttribute("data-seen", "1");
+    video.classList.add("is-framed");
+    finishArm(video);
+  }
+
+  function startVideo(video) {
+    var url = video.getAttribute("data-resolved") || "";
+    var result;
     if (!url) {
       video.setAttribute("data-want-play", "1");
       return;
     }
-    video.setAttribute("data-resolved", url);
+    if (video.getAttribute("data-playing") === "1" && video.getAttribute("data-started") === url) return;
     parkOthers(video);
     video.classList.add("is-active");
     video.classList.remove("is-framed");
+    video.removeAttribute("data-seen");
     video.setAttribute("data-arming", "1");
-    try { video.pause(); } catch (e) {}
-    video.src = url;
-    try { video.load(); } catch (e2) {}
+    video.setAttribute("data-resolved", url);
+    video.setAttribute("data-started", url);
     video.removeAttribute("data-want-play");
     video.setAttribute("data-playing", "1");
-    playVideo(video);
-  }
-
-  function showSoundChip() {}
-
-  function audioQuery() {
-    var value = queryParam("audio");
-    if (value === "1" || value === "true") return "on";
-    if (value === "0" || value === "false") return "off";
-    return "";
-  }
-
-  function wantAudio() {
-    var flag = audioQuery();
-    var ground;
-    if (flag === "on" || soundUnlocked) return true;
-    if (flag === "off") return false;
-    ground = findGround(currentDoc);
-    if (!ground || ground.play_audio == null) return true;
-    return ground.play_audio !== false;
-  }
-
-  function resumeAudio() {
-    var AC = window.AudioContext || window.webkitAudioContext;
-    var source;
-    var buffer;
-    if (!AC) return;
-    try {
-      if (!audioCtx) audioCtx = new AC();
-      if (audioCtx.state !== "running" && audioCtx.resume) {
-        var pending = audioCtx.resume();
-        if (pending && pending.catch) pending.catch(function () {});
-      }
-      buffer = audioCtx.createBuffer(1, 1, 22050);
-      source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioCtx.destination);
-      source.start(0);
-    } catch (e) {}
-  }
-
-  function markAudible(video) {
-    video.removeAttribute("muted");
-    video.defaultMuted = false;
-    video.muted = false;
-    video.volume = 1;
-  }
-
-  function revealVideo(video) {
-    if (!video || video.getAttribute("data-playing") !== "1") return;
-    if (!video.classList.contains("is-active")) return;
-    video.classList.add("is-framed");
-    document.body.classList.remove("mode-image");
-    hideStills();
-    setMode("ad");
-    finishArm(video);
-  }
-
-  function activeVideo() {
-    var key;
-    for (key in videos) {
-      if (videos.hasOwnProperty(key) && videos[key].classList.contains("is-active")) return videos[key];
-    }
-    return null;
-  }
-
-  function unlockSound() {
-    var video;
-    if (soundUnlocked) return;
-    soundUnlocked = true;
-    video = activeVideo();
-    if (!video) return;
-    resumeAudio();
-    markAudible(video);
-    playAndReveal(video, false);
-  }
-
-  function playAndReveal(video, allowMuteFallback) {
-    var result;
+    if (video.getAttribute("src") !== url) video.src = url;
+    try { video.currentTime = 0; } catch (e) {}
     try {
       result = video.play();
-    } catch (e) {
-      if (allowMuteFallback) playMutedThenUnmute(video);
+    } catch (err) {
+      finishArm(video);
+      if (window.console && console.log) console.log("Pulse Play video play failed", err && err.message);
       return;
     }
     if (result && result.then) {
       result.then(function () {
-        revealVideo(video);
-      }).catch(function () {
-        if (allowMuteFallback) playMutedThenUnmute(video);
+        revealOnce(video);
+      }).catch(function (err) {
+        finishArm(video);
+        if (window.console && console.log) console.log("Pulse Play video play rejected", err && err.message);
       });
-      return;
     }
-    revealVideo(video);
-  }
-
-  function unmuteAfterStart(video) {
-    var attempt = 0;
-    function tick() {
-      var result;
-      if (!wantAudio() || attempt > 5) return;
-      if (video.getAttribute("data-playing") !== "1" || !video.classList.contains("is-active")) return;
-      attempt += 1;
-      resumeAudio();
-      markAudible(video);
-      try {
-        result = video.play();
-      } catch (e) {
-        video.muted = true;
-        window.setTimeout(tick, 400);
-        return;
-      }
-      if (result && result.then) {
-        result.then(function () {
-          if (video.muted) window.setTimeout(tick, 400);
-        }).catch(function () {
-          video.muted = true;
-          var again = video.play();
-          if (again && again.catch) again.catch(function () {});
-          window.setTimeout(tick, 400);
-        });
-      }
-    }
-    tick();
-  }
-
-  function playMutedThenUnmute(video) {
-    var result;
-    video.muted = true;
-    try {
-      result = video.play();
-    } catch (e) {
-      return;
-    }
-    function after() {
-      revealVideo(video);
-      if (wantAudio()) unmuteAfterStart(video);
-    }
-    if (result && result.then) result.then(after).catch(function () {});
-    else after();
-  }
-
-  function playVideo(video) {
-    resumeAudio();
-    if (!wantAudio()) {
-      video.muted = true;
-      playAndReveal(video, false);
-      return;
-    }
-    markAudible(video);
-    playAndReveal(video, true);
   }
 
   function timeMs(value) {
@@ -402,11 +294,15 @@
     var ground;
     var node = videos[adId];
     if (!currentDoc) return;
-    if (node && node.getAttribute("data-arming") === "1") return;
-    if (node && node.duration > 1 && node.currentTime > 0 && node.currentTime < 0.5) return;
+    if (!node || node.getAttribute("data-playing") !== "1") return;
+    if (!node.classList.contains("is-active")) return;
+    if (node.getAttribute("data-arming") === "1") return;
+    if (!isFinite(node.duration) || node.duration < 0.5) return;
+    if (node.currentTime < node.duration - 0.5) return;
     ad = findAd(currentDoc, adId);
     ground = findGround(currentDoc);
     if (!ground || ground.mode !== "ad" || ground.active_ad !== adId) return;
+    if (shownKey !== "ad:" + adId) return;
     if (isImageAd(ad)) return;
     returnHold = {
       groundId: ground.id,
@@ -463,19 +359,14 @@
           node.setAttribute("playsinline", "");
           node.setAttribute("webkit-playsinline", "");
           node.setAttribute("disableremoteplayback", "");
+          node.setAttribute("autoplay", "");
           node.setAttribute("poster", SILENT_POSTER);
           node.controls = false;
-          node.defaultMuted = false;
-          node.muted = false;
-          node.volume = 1;
           node.loop = false;
           videos[ad.id] = node;
           (function (adId, video) {
             video.addEventListener("ended", function () { onEnded(adId); });
-            video.addEventListener("playing", function () { revealVideo(video); });
-            video.addEventListener("timeupdate", function () {
-              if (video.currentTime > 0) revealVideo(video);
-            });
+            video.addEventListener("playing", function () { revealOnce(video); });
           })(ad.id, node);
         }
         node.setAttribute("data-ad-id", ad.id);
@@ -527,6 +418,8 @@
     var logos = document.getElementById("view-logos");
     var ad = document.getElementById("view-ad");
     var toAd = mode === "ad";
+    if (document.body.getAttribute("data-view") === mode) return;
+    document.body.setAttribute("data-view", mode);
     if (toAd) {
       document.body.classList.add("mode-ad");
       document.body.classList.remove("mode-logos-score");
@@ -569,7 +462,6 @@
 
   function showLogos() {
     var key;
-    showSoundChip(false);
     document.body.classList.remove("mode-image");
     setMode("logos");
     hideStills();
@@ -582,9 +474,6 @@
     var ad = findAd(currentDoc, adId);
     var image = isImageAd(ad);
     var node;
-    var groundNow;
-    var command;
-    var same;
     if (image) {
       setMode("ad");
       document.body.classList.add("mode-image");
@@ -599,31 +488,16 @@
     }
     node = videos[adId];
     if (!node) return;
-    groundNow = findGround(currentDoc);
-    command = adId + ":" + (groundNow ? String(timeMs(groundNow.updated_at)) : "");
-    same = node.getAttribute("data-command") === command;
-    if (same && node.getAttribute("data-playing") === "1" && node.classList.contains("is-framed") && !node.paused && !node.ended && node.readyState >= 2) {
+    setMode("ad");
+    document.body.classList.remove("mode-image");
+    hideStills();
+    if (node.getAttribute("data-command") === adId && node.getAttribute("data-playing") === "1") {
       node.classList.add("is-active");
-      parkOthers(node);
-      setMode("ad");
+      if (node.getAttribute("data-seen") === "1") node.classList.add("is-framed");
       return;
     }
-    if (!same) node.removeAttribute("data-retried");
-    node.setAttribute("data-command", command);
-    node.classList.add("is-active");
-    node.classList.remove("is-framed");
-    playFromStart(node);
-    if (node.getAttribute("data-retried") === "1") return;
-    window.setTimeout(function () {
-      if (node.getAttribute("data-command") !== command) return;
-      if (node.getAttribute("data-retried") === "1") return;
-      if (node.classList.contains("is-framed") || node.currentTime > 0 || (!node.paused && !node.ended)) {
-        finishArm(node);
-        return;
-      }
-      node.setAttribute("data-retried", "1");
-      playFromStart(node);
-    }, 700);
+    node.setAttribute("data-command", adId);
+    startVideo(node);
   }
 
   function schedule() {
@@ -631,10 +505,30 @@
     pollTimer = window.setInterval(poll, pollMs);
   }
 
+  function logoPart(doc, id) {
+    var asset = findAsset(doc, id);
+    return (id || "") + "@" + (asset ? asset.src : "") + "@" + (asset && asset.logo_scale != null ? asset.logo_scale : "");
+  }
+
+  function visualSig(doc, ground) {
+    var logos = (ground && ground.logos) || {};
+    return [
+      ground ? (ground.mode || "logos_score") : "",
+      ground ? (ground.active_ad || "") : "",
+      logoPart(doc, logos.age_group_sponsor),
+      logoPart(doc, logos.tournament),
+      logoPart(doc, logos.cricketcraze),
+      ground ? (ground.score_url || "") : "",
+      JSON.stringify(ground ? (ground.layout || null) : null)
+    ].join("|");
+  }
+
   function apply(doc) {
     var ground;
     var logos;
     var nextPoll;
+    var sig;
+    var nextKey;
     currentDoc = doc;
     ground = findGround(doc);
     if (!groundId || !ground) {
@@ -649,6 +543,18 @@
     }
     hideStatus();
     noteReturn(ground);
+    sig = visualSig(doc, ground);
+    if (sig === appliedSig) {
+      nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;
+      if (nextPoll < 2000) nextPoll = 2000;
+      if (nextPoll > 300000) nextPoll = 300000;
+      if (nextPoll !== pollMs) {
+        pollMs = nextPoll;
+        schedule();
+      }
+      return;
+    }
+    appliedSig = sig;
     logos = ground.logos || {};
     setLogo("logo-age", assetSrc(doc, logos.age_group_sponsor));
     setLogo("logo-tournament", assetSrc(doc, logos.tournament));
@@ -669,9 +575,6 @@
       });
     }
     setScore(ground.score_url);
-    ensureAds(doc, ground);
-    if (ground.mode === "ad" && ground.active_ad) showAd(ground.active_ad);
-    else showLogos();
     nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;
     if (nextPoll < 2000) nextPoll = 2000;
     if (nextPoll > 300000) nextPoll = 300000;
@@ -679,6 +582,16 @@
       pollMs = nextPoll;
       schedule();
     }
+    nextKey = ground.mode === "ad" && ground.active_ad ? "ad:" + ground.active_ad : "logos";
+    if (nextKey === shownKey) return;
+    ensureAds(doc, ground);
+    shownKey = nextKey;
+    if (nextKey === "logos") showLogos();
+    else showAd(ground.active_ad);
+  }
+
+  function deliver(doc) {
+    apply(doc);
   }
 
   function poll() {
@@ -690,16 +603,14 @@
         hideStatus();
         return;
       }
-      apply(doc);
+      deliver(doc);
     });
   }
 
-  document.addEventListener("click", unlockSound, true);
-  document.addEventListener("touchend", unlockSound, true);
   window.addEventListener("resize", fitStage);
   fitStage();
   store.subscribe(function (err, doc) {
-    if (!err && doc) apply(doc);
+    if (!err && doc) deliver(doc);
   });
   poll();
   schedule();

@@ -233,7 +233,6 @@
           },
           ad_ids: [],
           layout: row.layout || null,
-          play_audio: row.play_audio !== false,
           updated_at: row.updated_at
         };
         byGround[ground.id] = ground;
@@ -332,7 +331,6 @@
             mode: ground.mode || "logos_score",
             active_ad_id: emptyToNull(ground.active_ad),
             layout: ground.layout || null,
-            play_audio: ground.play_audio !== false,
             updated_at: ground.updated_at
           });
           for (j = 0; j < (ground.ad_ids || []).length; j++) {
