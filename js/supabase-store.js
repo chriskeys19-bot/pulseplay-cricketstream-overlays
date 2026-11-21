@@ -236,6 +236,8 @@
           layout: row.layout || null,
           external_video_audio: row.external_video_audio === true,
           score_overlays: row.score_overlays || [],
+          show_subscribe_ticker: row.show_subscribe_ticker !== false,
+          ticker_trigger_at: row.ticker_trigger_at || null,
           updated_at: row.updated_at
         };
         byGround[ground.id] = ground;
@@ -250,6 +252,10 @@
         version: 3,
         poll_ms: settings.poll_ms || pollMs,
         auto_return_on_end: settings.auto_return_on_end !== false,
+        ticker_enabled: settings.ticker_enabled !== false,
+        ticker_interval_seconds: settings.ticker_interval_seconds || 600,
+        ticker_duration_seconds: settings.ticker_duration_seconds || 20,
+        ticker_messages: settings.ticker_messages || null,
         assets: assets,
         grounds: grounds
       };
@@ -337,6 +343,8 @@
             layout: ground.layout || null,
             external_video_audio: ground.external_video_audio === true,
             score_overlays: ground.score_overlays || [],
+            show_subscribe_ticker: ground.show_subscribe_ticker !== false,
+            ticker_trigger_at: ground.ticker_trigger_at || null,
             updated_at: ground.updated_at
           });
           for (j = 0; j < (ground.ad_ids || []).length; j++) {
@@ -346,7 +354,11 @@
         rest("pp_settings?on_conflict=id", "POST", token, [{
           id: 1,
           poll_ms: doc.poll_ms || pollMs,
-          auto_return_on_end: doc.auto_return_on_end !== false
+          auto_return_on_end: doc.auto_return_on_end !== false,
+          ticker_enabled: doc.ticker_enabled !== false,
+          ticker_interval_seconds: doc.ticker_interval_seconds || 600,
+          ticker_duration_seconds: doc.ticker_duration_seconds || 20,
+          ticker_messages: doc.ticker_messages || null
         }], "resolution=merge-duplicates,return=minimal", function (settingsErr) {
           if (settingsErr) { callback(settingsErr); return; }
           upsert("pp_assets", assets, token, function (assetErr) {
@@ -382,7 +394,9 @@
         logo_cricketcraze_id: emptyToNull(ground.logos && ground.logos.cricketcraze),
         layout: ground.layout || null,
         external_video_audio: ground.external_video_audio === true,
-        score_overlays: ground.score_overlays || []
+        score_overlays: ground.score_overlays || [],
+        show_subscribe_ticker: ground.show_subscribe_ticker !== false,
+        ticker_trigger_at: ground.ticker_trigger_at || null
       };
       if (live) {
         row.mode = ground.mode || "logos_score";
@@ -411,6 +425,8 @@
         layout: row.layout || null,
         external_video_audio: row.external_video_audio === true,
         score_overlays: row.score_overlays || [],
+        show_subscribe_ticker: row.show_subscribe_ticker !== false,
+        ticker_trigger_at: row.ticker_trigger_at || null,
         updated_at: row.updated_at
       };
     }

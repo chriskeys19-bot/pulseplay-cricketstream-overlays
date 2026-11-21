@@ -20,6 +20,12 @@
   var polling = false;
   var POLL_MIN_SECONDS = 2;
   var POLL_MAX_SECONDS = 300;
+  var TICKER_LINES = [
+    "Enjoying the game? Like and subscribe to CricketCrazeUSA for more USA cricket!",
+    "Never miss a match. Subscribe to CricketCrazeUSA and tap the bell \uD83D\uDD14",
+    "Share this stream with family and friends who couldn't make it to the ground!"
+  ];
+  var tickerFormSig = "";
   var TAP_GUARD_MS = 3000;
   var lastControlTap = { key: "", at: 0 };
   var scoreFullTouched = false;
@@ -320,6 +326,8 @@
       localLink.removeAttribute("href");
       if (document.getElementById("external-video")) document.getElementById("external-video").disabled = true;
       if (document.getElementById("score-switch")) document.getElementById("score-switch").classList.add("is-off");
+      if (document.getElementById("show-ticker")) document.getElementById("show-ticker").disabled = true;
+      if (document.getElementById("btn-ticker-now")) document.getElementById("btn-ticker-now").disabled = true;
       return;
     }
     setText(document.getElementById("st-name"), ground.name);
@@ -338,6 +346,11 @@
       document.getElementById("external-video").disabled = false;
     }
     renderScoreSwitch(ground);
+    if (document.getElementById("show-ticker") && document.activeElement !== document.getElementById("show-ticker")) {
+      document.getElementById("show-ticker").checked = ground.show_subscribe_ticker !== false;
+      document.getElementById("show-ticker").disabled = false;
+    }
+    if (document.getElementById("btn-ticker-now")) document.getElementById("btn-ticker-now").disabled = false;
   }
 
   function scoreList(ground) {
@@ -746,7 +759,8 @@
       ccusa: source.logos ? source.logos.cricketcraze : "",
       ads: (source.ad_ids || []).slice(),
       layout: source.layout || null,
-      external: source.external_video_audio === true
+      external: source.external_video_audio === true,
+      ticker: source.show_subscribe_ticker !== false
     });
     showBanner("Copy of " + source.name + " is ready. Logos, layout, and ads were copied. Set a short URL and a new score URL. Saved score overlays were not copied.");
   }
@@ -1301,6 +1315,7 @@
     setLayoutLogo("layout-tournament", tournament);
     setLayoutLogo("layout-ccusa", ccusa);
     fitPreviewScore();
+    placePreviewTicker();
   }
 
   function fitPreviewScore() {
@@ -1327,6 +1342,28 @@
     }
   }
 
+  function placePreviewTicker() {
+    var score = document.getElementById("layout-score");
+    var bar = document.getElementById("layout-ticker");
+    var bottom;
+    var height;
+    var sy;
+    var next;
+    var message;
+    if (!score || !bar) return;
+    bottom = parseFloat(score.style.bottom);
+    height = parseFloat(score.style.height);
+    sy = parseFloat(score.style.getPropertyValue("--score-sy"));
+    if (!sy) sy = 1;
+    if (isNaN(bottom) || isNaN(height)) return;
+    next = Math.round(bottom + height * sy + 10) + "px";
+    if (bar.style.bottom !== next) bar.style.bottom = next;
+    message = currentDoc && currentDoc.ticker_messages && currentDoc.ticker_messages[0]
+      ? currentDoc.ticker_messages[0]
+      : TICKER_LINES[0];
+    if ((bar.textContent || "") !== message) setText(bar, message);
+  }
+
   function readSetupDraft() {
     var select = document.getElementById("setup-select");
     if (!select.options.length) return null;
@@ -1343,7 +1380,8 @@
       ccusa: document.getElementById("pick-ccusa").value,
       ads: checkedAdIds(),
       layout: readLayoutForm(),
-      external: document.getElementById("field-external").checked
+      external: document.getElementById("field-external").checked,
+      ticker: document.getElementById("field-ticker").checked
     };
   }
 
@@ -1357,6 +1395,7 @@
     document.getElementById("field-device").value = draft.device;
     document.getElementById("field-score").value = draft.score;
     document.getElementById("field-external").checked = !!draft.external;
+    document.getElementById("field-ticker").checked = draft.ticker !== false;
     refreshScoreWarn();
     if (selectHas(document.getElementById("pick-age"), draft.age)) document.getElementById("pick-age").value = draft.age;
     if (selectHas(document.getElementById("pick-tournament"), draft.tournament)) document.getElementById("pick-tournament").value = draft.tournament;
@@ -1456,6 +1495,7 @@
         document.getElementById("field-device").value = "pro";
         document.getElementById("field-score").value = "";
         document.getElementById("field-external").checked = false;
+        document.getElementById("field-ticker").checked = true;
         setText(document.getElementById("field-resolved"), "Resolved URL is filled in when you save.");
         writeLayoutForm(null);
         refreshScoreWarn();
@@ -1475,6 +1515,7 @@
       document.getElementById("field-device").value = ground.device;
       document.getElementById("field-score").value = ground.score_url;
       document.getElementById("field-external").checked = ground.external_video_audio === true;
+      document.getElementById("field-ticker").checked = ground.show_subscribe_ticker !== false;
       setText(document.getElementById("field-resolved"), "Resolves to " + ground.resolved_url);
       writeLayoutForm(ground.layout);
       refreshScoreWarn();
@@ -1533,7 +1574,7 @@
   }
 
   function showTab(name) {
-    var panels = ["controls", "center", "library", "logos", "setup"];
+    var panels = ["controls", "center", "library", "logos", "setup", "ticker"];
     var i;
     var panel;
     var tab;
@@ -1552,6 +1593,7 @@
     if (name === "library") renderLibrary();
     if (name === "logos") renderLogoLibrary();
     if (name === "setup") renderSetupList();
+    if (name === "ticker") loadTickerForm();
   }
 
   function renderAll() {
@@ -1573,6 +1615,7 @@
     if (!document.getElementById("panel-library").classList.contains("is-off")) renderLibrary();
     if (!document.getElementById("panel-logos").classList.contains("is-off")) renderLogoLibrary();
     if (!document.getElementById("panel-setup").classList.contains("is-off")) renderSetupList();
+    if (!document.getElementById("panel-ticker").classList.contains("is-off")) loadTickerForm();
   }
 
   function saveDoc(hint) {
@@ -1598,6 +1641,101 @@
     }
     if (!opts || !opts.keepUpdatedAt) ground.updated_at = new Date().toISOString();
     saveDoc("Saved " + ground.name + " at " + formatTime(ground.updated_at) + ". The overlay follows within about 2 seconds, often sooner in this browser.");
+  }
+
+  function tickerMessagesFromDoc() {
+    var raw = currentDoc && currentDoc.ticker_messages;
+    var out = [];
+    var i;
+    if (raw && raw.length) {
+      for (i = 0; i < raw.length; i++) {
+        if (raw[i] && String(raw[i]).replace(/^\s+|\s+$/g, "")) out.push(String(raw[i]).replace(/^\s+|\s+$/g, ""));
+      }
+    }
+    return out.length ? out : TICKER_LINES.slice();
+  }
+
+  function addTickerLine(value) {
+    var row = document.createElement("div");
+    var input = document.createElement("input");
+    var remove = document.createElement("button");
+    row.className = "ticker-line";
+    input.type = "text";
+    input.value = value || "";
+    remove.type = "button";
+    remove.className = "btn-text";
+    setText(remove, "Remove");
+    remove.onclick = function () {
+      if (row.parentNode) row.parentNode.removeChild(row);
+    };
+    row.appendChild(input);
+    row.appendChild(remove);
+    document.getElementById("ticker-lines").appendChild(row);
+  }
+
+  function loadTickerForm() {
+    var panel = document.getElementById("panel-ticker");
+    var lines;
+    var sig;
+    var i;
+    if (!panel || !currentDoc) return;
+    if (panel.contains(document.activeElement)) return;
+    lines = tickerMessagesFromDoc();
+    sig = (currentDoc.ticker_enabled === false ? "0" : "1") + "|" +
+      (currentDoc.ticker_interval_seconds || 600) + "|" +
+      (currentDoc.ticker_duration_seconds || 20) + "|" +
+      lines.join("\n");
+    if (sig === tickerFormSig) return;
+    tickerFormSig = sig;
+    document.getElementById("ticker-enabled").checked = currentDoc.ticker_enabled !== false;
+    document.getElementById("ticker-interval").value = String(Math.round((currentDoc.ticker_interval_seconds || 600) / 60));
+    document.getElementById("ticker-duration").value = String(currentDoc.ticker_duration_seconds || 20);
+    clear(document.getElementById("ticker-lines"));
+    for (i = 0; i < lines.length; i++) addTickerLine(lines[i]);
+  }
+
+  function saveTickerForm(event) {
+    var inputs = document.getElementById("ticker-lines").getElementsByTagName("input");
+    var lines = [];
+    var minutes;
+    var seconds;
+    var i;
+    event.preventDefault();
+    for (i = 0; i < inputs.length; i++) {
+      if (inputs[i].value.replace(/^\s+|\s+$/g, "")) lines.push(inputs[i].value.replace(/^\s+|\s+$/g, ""));
+    }
+    if (!lines.length) {
+      showBanner("Add at least one ticker line.");
+      return;
+    }
+    minutes = parseInt(document.getElementById("ticker-interval").value, 10);
+    seconds = parseInt(document.getElementById("ticker-duration").value, 10);
+    if (!minutes || minutes < 1) minutes = 1;
+    if (minutes > 1440) minutes = 1440;
+    if (!seconds || seconds < 5) seconds = 5;
+    if (seconds > 180) seconds = 180;
+    currentDoc.ticker_enabled = document.getElementById("ticker-enabled").checked;
+    currentDoc.ticker_interval_seconds = minutes * 60;
+    currentDoc.ticker_duration_seconds = seconds;
+    currentDoc.ticker_messages = lines;
+    tickerFormSig = "";
+    saveDoc("Subscribe ticker saved. Each ground picks it up on the next poll.");
+  }
+
+  function stampTicker(groundIds) {
+    var stamp = new Date().toISOString();
+    var i;
+    var ground;
+    var hit = false;
+    if (!currentDoc) return;
+    for (i = 0; i < currentDoc.grounds.length; i++) {
+      ground = currentDoc.grounds[i];
+      if (groundIds && indexOf(groundIds, ground.id) === -1) continue;
+      ground.ticker_trigger_at = stamp;
+      hit = true;
+    }
+    if (!hit) return;
+    saveDoc(groundIds ? "Subscribe ticker will scroll once on this ground." : "Subscribe ticker will scroll once on every ground.");
   }
 
   function openGround(id) {
@@ -2133,6 +2271,7 @@
   document.getElementById("tab-library").onclick = function () { showTab("library"); };
   document.getElementById("tab-logos").onclick = function () { showTab("logos"); };
   document.getElementById("tab-setup").onclick = function () { showTab("setup"); };
+  document.getElementById("tab-ticker").onclick = function () { showTab("ticker"); };
   document.getElementById("ground-select").onchange = function () {
     currentId = this.value;
     actionSig = "";
@@ -2147,6 +2286,17 @@
     patch(currentId, { external_video_audio: this.checked });
   };
   document.getElementById("score-switch-save").onclick = addScoreOverlay;
+  document.getElementById("show-ticker").onchange = function () {
+    if (!currentId) return;
+    patch(currentId, { show_subscribe_ticker: this.checked }, { keepUpdatedAt: true });
+  };
+  document.getElementById("btn-ticker-now").onclick = function () {
+    if (!currentId) return;
+    stampTicker([currentId]);
+  };
+  document.getElementById("btn-ticker-all").onclick = function () { stampTicker(null); };
+  document.getElementById("btn-ticker-add").onclick = function () { addTickerLine(""); };
+  document.getElementById("ticker-form").onsubmit = saveTickerForm;
   document.getElementById("score-switch-url").oninput = function () {
     var box = document.getElementById("score-full-size");
     refreshScoreSwitchDraftWarn();
@@ -2157,6 +2307,7 @@
   document.getElementById("field-score").oninput = function () {
     refreshScoreWarn();
     fitPreviewScore();
+    placePreviewTicker();
   };
   document.getElementById("field-external").onchange = function () { externalDirty = true; };
   document.getElementById("btn-duplicate-ground").onclick = duplicateGround;

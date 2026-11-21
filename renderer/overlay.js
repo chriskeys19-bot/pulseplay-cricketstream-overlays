@@ -16,6 +16,16 @@
   var shownKey = "";
   var appliedSig = "";
   var placedKey = "";
+  var tickerSeen = undefined;
+  var tickerPending = false;
+  var tickerWait = null;
+  var tickerHide = null;
+  var tickerGap = 0;
+  var TICKER_LINES = [
+    "Enjoying the game? Like and subscribe to CricketCrazeUSA for more USA cricket!",
+    "Never miss a match. Subscribe to CricketCrazeUSA and tap the bell \uD83D\uDD14",
+    "Share this stream with family and friends who couldn't make it to the ground!"
+  ];
   var externalTimer = null;
   var externalToken = 0;
   var externalSent = "";
@@ -671,6 +681,156 @@
     return (id || "") + "@" + (asset ? asset.src : "") + "@" + (asset && asset.logo_scale != null ? asset.logo_scale : "");
   }
 
+  function tickerLines(doc) {
+    var raw = doc && doc.ticker_messages;
+    var out = [];
+    var i;
+    if (raw && raw.length) {
+      for (i = 0; i < raw.length; i++) {
+        if (raw[i] && String(raw[i]).replace(/^\s+|\s+$/g, "")) out.push(String(raw[i]).replace(/^\s+|\s+$/g, ""));
+      }
+    }
+    return out.length ? out : TICKER_LINES;
+  }
+
+  function tickerGapMs(doc) {
+    var seconds = doc && doc.ticker_interval_seconds != null ? Number(doc.ticker_interval_seconds) : 600;
+    if (!isFinite(seconds) || seconds < 5) seconds = 5;
+    if (seconds > 86400) seconds = 86400;
+    return Math.round(seconds * 1000);
+  }
+
+  function tickerRunMs(doc) {
+    var seconds = doc && doc.ticker_duration_seconds != null ? Number(doc.ticker_duration_seconds) : 20;
+    if (!isFinite(seconds) || seconds < 5) seconds = 5;
+    if (seconds > 180) seconds = 180;
+    return Math.round(seconds * 1000);
+  }
+
+  function tickerAllowed(doc, ground) {
+    if (!doc || !ground) return false;
+    if (doc.ticker_enabled === false) return false;
+    if (ground.show_subscribe_ticker === false) return false;
+    return tickerLines(doc).length > 0;
+  }
+
+  function adCovering(doc, ground) {
+    return externalVideo(doc, ground) || !!(ground && ground.mode === "ad" && ground.active_ad);
+  }
+
+  function setTickerText(doc) {
+    var node = document.getElementById("subscribe-ticker-text");
+    var text = tickerLines(doc).join("    \u00b7    ");
+    if (!node || (node.textContent || "") === text) return;
+    node.textContent = text;
+  }
+
+  function placeTicker() {
+    var score = document.getElementById("score-slot");
+    var bar = document.getElementById("subscribe-ticker");
+    var bottom;
+    var height;
+    var sy;
+    var next;
+    if (!score || !bar) return;
+    bottom = parseFloat(score.style.bottom);
+    height = parseFloat(score.style.height);
+    sy = parseFloat(score.style.getPropertyValue("--score-sy"));
+    if (!sy) sy = 1;
+    if (isNaN(bottom) || isNaN(height)) return;
+    /* Sit above the painted score. --score-sy is 2.15 for the short
+       overlay.cricclubs.com bar and 1 for a full-size page. */
+    next = Math.round(bottom + height * sy + 10) + "px";
+    if (bar.style.bottom !== next) bar.style.bottom = next;
+  }
+
+  function hideTicker() {
+    var bar = document.getElementById("subscribe-ticker");
+    if (!bar || !bar.classList.contains("is-on")) return;
+    bar.classList.remove("is-on");
+    if (bar.getAttribute("aria-hidden") !== "true") bar.setAttribute("aria-hidden", "true");
+  }
+
+  function clearTickerTimers() {
+    if (tickerWait) window.clearTimeout(tickerWait);
+    if (tickerHide) window.clearTimeout(tickerHide);
+    tickerWait = null;
+    tickerHide = null;
+  }
+
+  function beginTickerRun(doc) {
+    var bar = document.getElementById("subscribe-ticker");
+    var track = bar ? bar.getElementsByClassName("subscribe-ticker__track")[0] : null;
+    var seconds = String(tickerRunMs(doc) / 1000) + "s";
+    if (tickerWait) window.clearTimeout(tickerWait);
+    tickerWait = null;
+    if (tickerHide) window.clearTimeout(tickerHide);
+    if (track) {
+      track.style.animation = "none";
+      void track.offsetWidth;
+      track.style.animation = "";
+      if (track.style.animationDuration !== seconds) track.style.animationDuration = seconds;
+    }
+    if (bar && !bar.classList.contains("is-on")) bar.classList.add("is-on");
+    if (bar && bar.getAttribute("aria-hidden") !== "false") bar.setAttribute("aria-hidden", "false");
+    tickerHide = window.setTimeout(function () {
+      tickerHide = null;
+      hideTicker();
+      armTickerWait(currentDoc);
+    }, tickerRunMs(doc));
+  }
+
+  function armTickerWait(doc) {
+    if (tickerWait) window.clearTimeout(tickerWait);
+    tickerGap = tickerGapMs(doc);
+    tickerWait = window.setTimeout(function () {
+      var ground = findGround(currentDoc);
+      tickerWait = null;
+      if (!tickerAllowed(currentDoc, ground)) return;
+      if (adCovering(currentDoc, ground)) {
+        tickerPending = true;
+        return;
+      }
+      beginTickerRun(currentDoc);
+    }, tickerGap);
+  }
+
+  function syncTicker(doc, ground) {
+    var trigger = ground && ground.ticker_trigger_at ? String(ground.ticker_trigger_at) : "";
+    var allowed = tickerAllowed(doc, ground);
+    var inAd = adCovering(doc, ground);
+    var gap = tickerGapMs(doc);
+    setTickerText(doc);
+    if (tickerSeen === undefined) tickerSeen = trigger;
+    else if (trigger !== tickerSeen) {
+      tickerSeen = trigger;
+      if (trigger) tickerPending = true;
+    }
+    if (!allowed) {
+      tickerPending = false;
+      clearTickerTimers();
+      hideTicker();
+      return;
+    }
+    if (inAd) {
+      if (tickerHide || (document.getElementById("subscribe-ticker") && document.getElementById("subscribe-ticker").classList.contains("is-on"))) {
+        if (tickerHide) window.clearTimeout(tickerHide);
+        tickerHide = null;
+        tickerPending = true;
+        hideTicker();
+      }
+      return;
+    }
+    if (tickerPending) {
+      tickerPending = false;
+      beginTickerRun(doc);
+      return;
+    }
+    if (tickerHide) return;
+    if (!tickerWait) armTickerWait(doc);
+    else if (gap !== tickerGap) armTickerWait(doc);
+  }
+
   function visualSig(doc, ground) {
     var logos = (ground && ground.logos) || {};
     return [
@@ -710,6 +870,8 @@
     }
     hideStatus();
     noteReturn(ground);
+    syncTicker(doc, ground);
+    placeTicker();
     sig = visualSig(doc, ground);
     if (sig === appliedSig) {
       rearmExternal(doc, ground);
@@ -751,6 +913,7 @@
       });
     }
     setScore(ground);
+    placeTicker();
     nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;
     if (nextPoll < 2000) nextPoll = 2000;
     if (nextPoll > 300000) nextPoll = 300000;
