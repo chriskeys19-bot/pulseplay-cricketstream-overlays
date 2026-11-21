@@ -39,6 +39,7 @@
       <button type="button" id="tab-library" class="tab">Ad Library</button>
       <button type="button" id="tab-logos" class="tab">Logo Library</button>
       <button type="button" id="tab-setup" class="tab">Ground setup</button>
+      <button type="button" id="tab-ticker" class="tab">Subscribe ticker</button>
       <button type="button" id="btn-sign-out" class="btn-text is-off">Sign out</button>
     </nav>
 
@@ -100,6 +101,15 @@
           <label>Name <input id="score-switch-name" type="text" placeholder="Game 2 – U13 vs Y"></label>
           <label>URL <input id="score-switch-url" type="text" placeholder="https://overlay.cricclubs.com/…"></label>
           <button type="button" id="score-switch-save">Save and show</button>
+        </div>
+      </div>
+      <div id="ticker-live" class="score-switch">
+        <p class="k">Subscribe ticker</p>
+        <label class="check"><input type="checkbox" id="show-ticker" checked> Show subscribe ticker</label>
+        <p class="hint">On by default. The line scrolls above the score every few minutes, and it stays off while an ad is playing.</p>
+        <div class="actions">
+          <button type="button" id="btn-ticker-now">Show subscribe ticker now</button>
+          <button type="button" id="btn-ticker-all">Show on all grounds</button>
         </div>
       </div>
       <p class="hint"><a id="local-overlay" href="renderer/pro.html" target="_blank" rel="noopener">Open overlay</a></p>
@@ -185,6 +195,7 @@
         <p class="hint" id="field-score-warn"></p>
         <p class="hint" id="field-resolved"></p>
         <label class="check"><input type="checkbox" id="field-external"> External video ad stream (SRT)</label>
+        <label class="check"><input type="checkbox" id="field-ticker" checked> Show subscribe ticker</label>
         <p class="hint">When this is on, a video ad leaves this page transparent so the SRT picture shows through, and the logos return after the ad's length plus 2.5 seconds.</p>
 
         <div class="logo-fields">
@@ -219,6 +230,7 @@
             <img id="layout-tournament" class="logo logo-tournament" alt="">
             <img id="layout-ccusa" class="logo logo-ccusa" alt="">
             <div id="layout-score" class="layout-score"><div class="layout-score-graphic">Score</div></div>
+            <div id="layout-ticker" class="layout-ticker">Enjoying the game? Like and subscribe to CricketCrazeUSA</div>
           </div>
         </div>
 
@@ -230,6 +242,22 @@
         <button type="submit">Save ground</button>
         <button type="button" id="btn-duplicate-ground">Duplicate ground</button>
         <button type="button" id="btn-delete-ground" class="btn-danger">Delete ground</button>
+      </form>
+    </section>
+
+    <section id="panel-ticker" class="is-off" aria-label="Subscribe ticker">
+      <div class="center-head">
+        <h2>Subscribe ticker</h2>
+        <p>A thin line above the score that asks viewers to like and subscribe. It scrolls on its own, and Ground controls can show it once right away. It hides while an ad is on.</p>
+      </div>
+      <form id="ticker-form" class="form">
+        <label class="check"><input type="checkbox" id="ticker-enabled" checked> Ticker on for every ground</label>
+        <label>How often it appears (minutes) <input id="ticker-interval" type="number" min="1" max="1440" step="1" value="10"></label>
+        <label>How long one pass stays up (seconds) <input id="ticker-duration" type="number" min="5" max="180" step="1" value="20"></label>
+        <p class="k">Messages</p>
+        <div id="ticker-lines"></div>
+        <button type="button" id="btn-ticker-add" class="btn-text">Add a line</button>
+        <button type="submit">Save ticker</button>
       </form>
     </section>
 
