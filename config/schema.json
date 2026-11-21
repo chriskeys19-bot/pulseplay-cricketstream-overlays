@@ -18,6 +18,27 @@
       "type": "boolean",
       "description": "Kept for older documents. The renderer ignores it. Every video returns to Logos + Score when it finishes."
     },
+    "ticker_enabled": {
+      "type": "boolean",
+      "description": "When false, the subscribe ticker stays hidden on every ground."
+    },
+    "ticker_interval_seconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 86400,
+      "description": "How often a ground shows the subscribe ticker on its own."
+    },
+    "ticker_duration_seconds": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 180,
+      "description": "How long one ticker pass stays on screen."
+    },
+    "ticker_messages": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Lines joined with a dot and scrolled as one pass."
+    },
     "assets": {
       "type": "array",
       "description": "Shared library. kind ad is an MP4 or a still image (PNG, JPG, or a PDF page saved as PNG). kind logo is a PNG, WebP, SVG, or JPG.",
@@ -166,6 +187,14 @@
           }
         },
         "logos": { "$ref": "#/definitions/logos" },
+        "show_subscribe_ticker": {
+          "type": "boolean",
+          "description": "When false, this ground does not show the subscribe ticker. Omit it to leave the ticker on."
+        },
+        "ticker_trigger_at": {
+          "type": ["string", "null"],
+          "description": "A new timestamp asks the renderer for one ticker pass. It does not change mode or the ad."
+        },
         "external_video_audio": {
           "type": "boolean",
           "description": "When true, a video ad leaves the web overlay transparent so an external SRT stream can show the picture and the sound."
