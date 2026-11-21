@@ -23,6 +23,9 @@
   var TAP_GUARD_MS = 3000;
   var lastControlTap = { key: "", at: 0 };
   var scoreFullTouched = false;
+  var layoutDirty = false;
+  var externalDirty = false;
+  var setupLoadedId = "";
 
   function setText(node, text) {
     if (!node) return;
@@ -30,11 +33,10 @@
     else node.innerText = text;
   }
 
-  function showBanner(message) {
+  function showBanner(message, kind) {
     var banner = document.getElementById("banner");
     setText(banner, message || "");
-    if (message) banner.classList.remove("is-off");
-    else banner.classList.add("is-off");
+    banner.className = "banner" + (message ? "" : " is-off") + (kind === "ok" ? " is-ok" : "");
   }
 
   function formatTime(iso) {
@@ -1103,6 +1105,7 @@
     }
     for (i = 0; i < currentDoc.grounds.length; i++) {
       parts.push("layout:" + currentDoc.grounds[i].id + ":" + JSON.stringify(currentDoc.grounds[i].layout || null));
+      parts.push("ext:" + currentDoc.grounds[i].id + ":" + (currentDoc.grounds[i].external_video_audio === true ? "1" : "0"));
     }
     return parts.join("|");
   }
@@ -1155,7 +1158,7 @@
       box.className = "layout-slot";
       title.className = "k";
       setText(title, LAYOUT_LABELS[name]);
-      scale = layoutField("layout-" + name + "-scale", "range", 25, 200, 5, 100);
+      scale = layoutField("layout-" + name + "-scale", "range", 25, 200, 1, 100);
       readout.id = "layout-" + name + "-readout";
       setText(readout, "100%");
       nudge.className = "hint";
@@ -1167,10 +1170,35 @@
       box.appendChild(scale);
       box.appendChild(readout);
       box.appendChild(nudge);
+      if (name === "score") {
+        var widthLabel = document.createElement("p");
+        var width = layoutField("layout-score-width", "range", 50, 100, 1, 100);
+        var widthRead = document.createElement("span");
+        widthLabel.className = "hint";
+        widthRead.id = "layout-score-width-readout";
+        setText(widthLabel, "Width ");
+        setText(widthRead, "100%");
+        widthLabel.appendChild(width);
+        widthLabel.appendChild(widthRead);
+        box.appendChild(widthLabel);
+        width.oninput = function () {
+          layoutDirty = true;
+          renderLayoutPreview();
+        };
+      }
       root.appendChild(box);
-      scale.oninput = renderLayoutPreview;
-      nudge.getElementsByTagName("input")[0].oninput = renderLayoutPreview;
-      nudge.getElementsByTagName("input")[1].oninput = renderLayoutPreview;
+      scale.oninput = function () {
+        layoutDirty = true;
+        renderLayoutPreview();
+      };
+      nudge.getElementsByTagName("input")[0].oninput = function () {
+        layoutDirty = true;
+        renderLayoutPreview();
+      };
+      nudge.getElementsByTagName("input")[1].oninput = function () {
+        layoutDirty = true;
+        renderLayoutPreview();
+      };
     }
   }
 
@@ -1193,6 +1221,9 @@
         y: Number(y && y.value)
       };
     }
+    if (raw.score && document.getElementById("layout-score-width")) {
+      raw.score.width = Number(document.getElementById("layout-score-width").value) / 100;
+    }
     return window.PulsePlayLayout.normalize(raw);
   }
 
@@ -1209,6 +1240,11 @@
       document.getElementById("layout-" + name + "-x").value = String(slot.x);
       document.getElementById("layout-" + name + "-y").value = String(slot.y);
       setText(document.getElementById("layout-" + name + "-readout"), Math.round(slot.scale * 100) + "%");
+    }
+    if (document.getElementById("layout-score-width")) {
+      var widthPct = norm.score && norm.score.width != null ? Math.round(norm.score.width * 100) : 100;
+      document.getElementById("layout-score-width").value = String(widthPct);
+      setText(document.getElementById("layout-score-width-readout"), widthPct + "%");
     }
   }
 
@@ -1239,6 +1275,9 @@
       scale = document.getElementById("layout-" + names[i] + "-scale");
       setText(document.getElementById("layout-" + names[i] + "-readout"), (scale ? scale.value : "100") + "%");
     }
+    if (document.getElementById("layout-score-width-readout")) {
+      setText(document.getElementById("layout-score-width-readout"), (document.getElementById("layout-score-width").value || "100") + "%");
+    }
     scale = preview.clientWidth / 1920;
     if (!scale || scale <= 0) scale = 0.5;
     stage.style.transform = "scale(" + scale + ")";
@@ -1266,12 +1305,26 @@
 
   function fitPreviewScore() {
     var slot = document.getElementById("layout-score");
+    var graphic = slot ? slot.getElementsByClassName("layout-score-graphic")[0] : null;
     var field = document.getElementById("field-score");
-    var compact;
-    if (!slot || !field || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
-    compact = window.PulsePlayScore.frameScale(field.value, null) === 2.15;
-    if (compact) slot.classList.add("is-compact");
-    else slot.classList.remove("is-compact");
+    var widthEl = document.getElementById("layout-score-width");
+    var base;
+    var width;
+    var sx;
+    var sy;
+    if (!slot || !graphic || !field || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
+    base = window.PulsePlayScore.frameScale(field.value, null);
+    width = widthEl ? Number(widthEl.value) / 100 : 1;
+    if (!width || width < 0.5) width = 1;
+    if (width > 1) width = 1;
+    sx = String(Math.round(base * width * 1000) / 1000);
+    sy = String(Math.round(base * 1000) / 1000);
+    if (slot.style.getPropertyValue("--score-sx") !== sx) slot.style.setProperty("--score-sx", sx);
+    if (slot.style.getPropertyValue("--score-sy") !== sy) slot.style.setProperty("--score-sy", sy);
+    if (graphic.style.transform !== "scale(var(--score-sx, 1), var(--score-sy, 1))") {
+      graphic.style.transform = "scale(var(--score-sx, 1), var(--score-sy, 1))";
+      graphic.style.transformOrigin = "bottom center";
+    }
   }
 
   function readSetupDraft() {
@@ -1351,6 +1404,11 @@
       cricketcraze: "logo-cricketcraze"
     };
     idTouched = false;
+    if (id !== setupLoadedId) {
+      layoutDirty = false;
+      externalDirty = false;
+      setupLoadedId = id;
+    }
     if (!draft || typeof draft.selection !== "string") draft = null;
     clear(checks);
     for (i = 0; i < ads.length; i++) {
@@ -1423,6 +1481,8 @@
     } else {
       applySetupDraft(draft);
     }
+    if (!layoutDirty) writeLayoutForm(ground.layout);
+    if (!externalDirty) document.getElementById("field-external").checked = ground.external_video_audio === true;
     renderLayoutPreview();
   }
 
@@ -1593,6 +1653,22 @@
     });
   }
 
+  function clearGroundErrors() {
+    var ids = ["err-name", "err-id", "err-short", "err-score"];
+    var i;
+    for (i = 0; i < ids.length; i++) setText(document.getElementById(ids[i]), "");
+  }
+
+  function setSaveStatus(kind, text) {
+    var el = document.getElementById("save-ground-status");
+    var btn = document.getElementById("btn-save-ground");
+    if (el) {
+      el.className = "save-status" + (kind ? " is-" + kind : "");
+      setText(el, text || "");
+    }
+    if (btn) btn.disabled = kind === "saving";
+  }
+
   function onSaveGround(event) {
     var select = document.getElementById("setup-select");
     var isNew = select.value === "__new__";
@@ -1605,59 +1681,106 @@
     var ground;
     var i;
     var adIds;
+    var layout;
+    var external;
+    var live;
+    var message;
     event.preventDefault();
+    clearGroundErrors();
+    if (!name) setText(document.getElementById("err-name"), "Enter a ground name.");
+    if (!shortLink) setText(document.getElementById("err-short"), "Enter a short URL.");
+    if (!scoreUrl) setText(document.getElementById("err-score"), "Enter a CricClubs URL.");
     if (!name || !shortLink || !scoreUrl) {
-      showBanner("Name, short URL, and CricClubs URL are required.");
+      message = "Name, short URL, and CricClubs URL are required.";
+      setSaveStatus("err", message);
+      showBanner(message);
       return;
     }
     if (!id) id = slug(name);
     if (!/^[a-z0-9-]+$/.test(id)) {
-      showBanner("Id can only use lowercase letters, numbers, and hyphens.");
+      message = "Id can only use lowercase letters, numbers, and hyphens.";
+      setText(document.getElementById("err-id"), message);
+      setSaveStatus("err", message);
+      showBanner(message);
       return;
     }
     if (isNew && findGround(currentDoc, id)) {
-      showBanner("A ground with that id already exists.");
+      message = "A ground with that id already exists.";
+      setText(document.getElementById("err-id"), message);
+      setSaveStatus("err", message);
+      showBanner(message);
+      return;
+    }
+    if (!store.writeGround) {
+      message = "This store cannot save one ground on its own.";
+      setSaveStatus("err", message);
+      showBanner(message);
       return;
     }
     adIds = checkedAdIds();
-    ground = existing || {
+    layout = !existing || layoutDirty ? readLayoutForm() : existing.layout;
+    if (window.PulsePlayLayout.isDefault(layout)) layout = null;
+    external = !existing || externalDirty ? document.getElementById("field-external").checked : existing.external_video_audio === true;
+    live = !existing;
+    ground = {
       id: id,
-      mode: "logos_score",
-      active_ad: null
+      name: name,
+      short_link: shortLink,
+      device: device,
+      resolved_url: resolvedFor(id, device),
+      score_url: scoreUrl,
+      score_overlays: freshScoreOverlays(existing, id, scoreUrl),
+      logos: {
+        age_group_sponsor: document.getElementById("pick-age").value,
+        tournament: document.getElementById("pick-tournament").value,
+        cricketcraze: document.getElementById("pick-ccusa").value
+      },
+      layout: layout,
+      external_video_audio: external,
+      show_subscribe_ticker: document.getElementById("field-ticker") ? document.getElementById("field-ticker").checked : (existing ? existing.show_subscribe_ticker !== false : true),
+      ad_ids: adIds,
+      mode: existing ? (existing.mode || "logos_score") : "logos_score",
+      active_ad: existing ? existing.active_ad : null,
+      updated_at: existing ? existing.updated_at : new Date().toISOString(),
+      ticker_trigger_at: existing ? existing.ticker_trigger_at || null : null
     };
-    ground.name = name;
-    ground.short_link = shortLink;
-    ground.device = device;
-    ground.resolved_url = resolvedFor(id, device);
-    ground.score_url = scoreUrl;
-    ground.score_overlays = freshScoreOverlays(existing, id, scoreUrl);
-    ground.logos = {
-      age_group_sponsor: document.getElementById("pick-age").value,
-      tournament: document.getElementById("pick-tournament").value,
-      cricketcraze: document.getElementById("pick-ccusa").value
-    };
-    ground.layout = window.PulsePlayLayout.isDefault(readLayoutForm()) ? null : readLayoutForm();
-    ground.external_video_audio = document.getElementById("field-external").checked;
-    ground.ad_ids = adIds;
     if (ground.active_ad && indexOf(adIds, ground.active_ad) === -1) {
       ground.mode = "logos_score";
       ground.active_ad = null;
+      ground.updated_at = new Date().toISOString();
+      live = true;
     }
-    ground.updated_at = new Date().toISOString();
-    if (!existing) currentDoc.grounds.push(ground);
-    else {
-      for (i = 0; i < currentDoc.grounds.length; i++) {
-        if (currentDoc.grounds[i].id === ground.id) currentDoc.grounds[i] = ground;
+    setSaveStatus("saving", "Saving…");
+    showBanner("");
+    store.writeGround(ground, { live: live }, function (err, saved, count) {
+      var when;
+      var note;
+      if (err || !count) {
+        note = (err && err.message) || "Saved 0 rows. This account may not be allowed to update " + name + ".";
+        setSaveStatus("err", note);
+        showBanner(note);
+        return;
       }
-    }
-    currentId = ground.id;
-    setupSig = null;
-    centerSig = "";
-    actionSig = "";
-    controlsSig = "";
-    saveDoc("Saved ground " + ground.name + ".");
-    document.getElementById("setup-select").value = ground.id;
-    loadSetupForm();
+      if (!existing) currentDoc.grounds.push(saved || ground);
+      else {
+        for (i = 0; i < currentDoc.grounds.length; i++) {
+          if (currentDoc.grounds[i].id === ground.id) currentDoc.grounds[i] = saved || ground;
+        }
+      }
+      currentId = ground.id;
+      layoutDirty = false;
+      externalDirty = false;
+      setupSig = null;
+      centerSig = "";
+      actionSig = "";
+      controlsSig = "";
+      when = formatTime(ground.updated_at);
+      note = "Saved " + ground.name + " at " + when;
+      setSaveStatus("ok", note);
+      showBanner(note, "ok");
+      document.getElementById("setup-select").value = ground.id;
+      loadSetupForm();
+    });
   }
 
   function onDeleteGround() {
@@ -2035,6 +2158,7 @@
     refreshScoreWarn();
     fitPreviewScore();
   };
+  document.getElementById("field-external").onchange = function () { externalDirty = true; };
   document.getElementById("btn-duplicate-ground").onclick = duplicateGround;
   (function wirePollPicks() {
     var buttons = document.getElementById("poll-picks").getElementsByTagName("button");

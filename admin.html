@@ -172,17 +172,21 @@
       <label>Edit
         <select id="setup-select"></select>
       </label>
-      <form id="ground-form" class="form">
-        <label>Ground name <input id="field-name" type="text" required></label>
-        <label>Id <input id="field-id" type="text" required pattern="[a-z0-9-]+"></label>
-        <label>Short URL <input id="field-short" type="url" required placeholder="https://short.sg/…"></label>
+      <form id="ground-form" class="form" novalidate>
+        <label>Ground name <input id="field-name" type="text"></label>
+        <p class="field-error" id="err-name"></p>
+        <label>Id <input id="field-id" type="text"></label>
+        <p class="field-error" id="err-id"></p>
+        <label>Short URL <input id="field-short" type="text" placeholder="https://short.sg/…"></label>
+        <p class="field-error" id="err-short"></p>
         <label>Device
           <select id="field-device">
             <option value="pro">YoloBox Pro</option>
             <option value="mini">YoloBox Mini</option>
           </select>
         </label>
-        <label>CricClubs overlay URL <input id="field-score" type="text" required></label>
+        <label>CricClubs overlay URL <input id="field-score" type="text"></label>
+        <p class="field-error" id="err-score"></p>
         <p class="hint" id="field-score-warn"></p>
         <p class="hint" id="field-resolved"></p>
         <label class="check"><input type="checkbox" id="field-external"> External video ad stream (SRT)</label>
@@ -228,7 +232,8 @@
           <div id="ad-checks"></div>
         </fieldset>
 
-        <button type="submit">Save ground</button>
+        <button type="submit" id="btn-save-ground">Save ground</button>
+        <p id="save-ground-status" class="save-status" role="status"></p>
         <button type="button" id="btn-duplicate-ground">Duplicate ground</button>
         <button type="button" id="btn-delete-ground" class="btn-danger">Delete ground</button>
       </form>
