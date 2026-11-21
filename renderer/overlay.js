@@ -170,17 +170,30 @@
     return fallback;
   }
 
+  function scoreWidthOf(ground) {
+    var width = ground && ground.layout && ground.layout.score && ground.layout.score.width;
+    if (width == null || width === "") return 1;
+    width = Number(width);
+    if (!isFinite(width)) return 1;
+    if (width < 0.5) return 0.5;
+    if (width > 1) return 1;
+    return width;
+  }
+
   function fitScore(ground) {
     var slot = document.getElementById("score-slot");
+    var frame = document.getElementById("score-frame");
     var scale;
-    var compact;
-    var has;
-    if (!slot || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
+    var width;
+    var sx;
+    var sy;
+    if (!slot || !frame || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
     scale = window.PulsePlayScore.frameScale(ground ? ground.score_url : "", scoreMeta(ground));
-    compact = scale > 1;
-    has = slot.classList.contains("is-compact");
-    if (compact && !has) slot.classList.add("is-compact");
-    else if (!compact && has) slot.classList.remove("is-compact");
+    width = scoreWidthOf(ground);
+    sx = String(Math.round(scale * width * 1000) / 1000);
+    sy = String(Math.round(scale * 1000) / 1000);
+    if (slot.style.getPropertyValue("--score-sx") !== sx) slot.style.setProperty("--score-sx", sx);
+    if (slot.style.getPropertyValue("--score-sy") !== sy) slot.style.setProperty("--score-sy", sy);
   }
 
   function setScore(ground) {
