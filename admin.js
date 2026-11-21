@@ -20,6 +20,9 @@
   var polling = false;
   var POLL_MIN_SECONDS = 2;
   var POLL_MAX_SECONDS = 300;
+  var TAP_GUARD_MS = 3000;
+  var lastControlTap = { key: "", at: 0 };
+  var scoreFullTouched = false;
 
   function setText(node, text) {
     if (!node) return;
@@ -345,12 +348,15 @@
       for (i = 0; i < raw.length; i++) {
         item = raw[i];
         if (!item || !item.url) continue;
-        out.push({
+        var saved = {
           id: String(item.id || ((ground.id || "ground") + "-score-" + (i + 1))),
           name: String(item.name || ("Game " + (out.length + 1))),
           url: String(item.url).replace(/^\s+|\s+$/g, ""),
           active: item.active === true
-        });
+        };
+        if (item.full_size === true) saved.full_size = true;
+        else if (item.full_size === false) saved.full_size = false;
+        out.push(saved);
       }
     }
     if (!out.length && ground && ground.score_url) {
@@ -467,11 +473,13 @@
     var taken;
     var n;
     var reused = false;
+    var fullSize;
     if (!ground) return;
     if (!name || !url) {
       showBanner("Give the score overlay a name and a URL.");
       return;
     }
+    fullSize = document.getElementById("score-full-size").checked;
     list = scoreList(ground);
     id = (ground.id || "ground") + "-" + (slug(name) || "score");
     taken = {};
@@ -484,13 +492,15 @@
     for (i = 0; i < list.length; i++) {
       if (list[i].url === url) {
         list[i].name = name;
+        list[i].full_size = fullSize;
         list[i].active = true;
         reused = true;
       } else list[i].active = false;
     }
-    if (!reused) list.push({ id: id, name: name, url: url, active: true });
+    if (!reused) list.push({ id: id, name: name, url: url, active: true, full_size: fullSize });
     document.getElementById("score-switch-name").value = "";
     document.getElementById("score-switch-url").value = "";
+    scoreFullTouched = false;
     refreshScoreSwitchDraftWarn();
     patch(ground.id, { score_url: url, score_overlays: list }, { keepUpdatedAt: true });
   }
@@ -561,6 +571,18 @@
     return videos.concat(images);
   }
 
+  function tapControl(groundId, fields) {
+    var now = Date.now();
+    var key = groundId + "|" + fields.mode + "|" + (fields.active_ad || "");
+    if (lastControlTap.key === key && now - lastControlTap.at < TAP_GUARD_MS) {
+      showBanner("That control was just sent. Wait a few seconds to start it again.");
+      return;
+    }
+    lastControlTap.key = key;
+    lastControlTap.at = now;
+    patch(groundId, fields);
+  }
+
   function makeAction(action, label, onclick) {
     var button = document.createElement("button");
     button.type = "button";
@@ -593,14 +615,14 @@
       actionSig = sig;
       clear(bar);
       bar.appendChild(makeAction("logos", "Logos + Score", function () {
-        patch(ground.id, { mode: "logos_score", active_ad: null });
+        tapControl(ground.id, { mode: "logos_score", active_ad: null });
       }));
       for (i = 0; i < ids.length; i++) {
         (function (adId) {
           var ad = findAd(currentDoc, adId);
           if (!ad) return;
           bar.appendChild(makeAction(adId, ad.label, function () {
-            patch(ground.id, { mode: "ad", active_ad: adId });
+            tapControl(ground.id, { mode: "ad", active_ad: adId });
           }));
         })(ids[i]);
       }
@@ -1239,6 +1261,17 @@
     setLayoutLogo("layout-age", age);
     setLayoutLogo("layout-tournament", tournament);
     setLayoutLogo("layout-ccusa", ccusa);
+    fitPreviewScore();
+  }
+
+  function fitPreviewScore() {
+    var slot = document.getElementById("layout-score");
+    var field = document.getElementById("field-score");
+    var compact;
+    if (!slot || !field || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
+    compact = window.PulsePlayScore.frameScale(field.value, null) === 2.15;
+    if (compact) slot.classList.add("is-compact");
+    else slot.classList.remove("is-compact");
   }
 
   function readSetupDraft() {
@@ -1991,8 +2024,17 @@
     patch(currentId, { external_video_audio: this.checked });
   };
   document.getElementById("score-switch-save").onclick = addScoreOverlay;
-  document.getElementById("score-switch-url").oninput = refreshScoreSwitchDraftWarn;
-  document.getElementById("field-score").oninput = refreshScoreWarn;
+  document.getElementById("score-switch-url").oninput = function () {
+    var box = document.getElementById("score-full-size");
+    refreshScoreSwitchDraftWarn();
+    if (scoreFullTouched || !box || !window.PulsePlayScore.frameScale) return;
+    box.checked = window.PulsePlayScore.frameScale(this.value, null) !== 2.15;
+  };
+  document.getElementById("score-full-size").onchange = function () { scoreFullTouched = true; };
+  document.getElementById("field-score").oninput = function () {
+    refreshScoreWarn();
+    fitPreviewScore();
+  };
   document.getElementById("btn-duplicate-ground").onclick = duplicateGround;
   (function wirePollPicks() {
     var buttons = document.getElementById("poll-picks").getElementsByTagName("button");

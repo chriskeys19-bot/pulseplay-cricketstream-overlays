@@ -89,8 +89,11 @@ body.mode-external #overlay-status {
   border: 0;
   background: transparent;
   color-scheme: normal;
-  transform: scale(2.15);
+  transform: none;
   transform-origin: bottom center;
+}
+#score-slot.is-compact #score-frame {
+  transform: scale(2.15);
 }
 #score-fallback {
   margin: 0;
