@@ -29,6 +29,7 @@
   var externalTimer = null;
   var externalToken = 0;
   var externalSent = "";
+  var externalPlay = "";
   var returnHold = null;
   var returnTimer = null;
   var pollMs = window.PulsePlayStore.DEFAULT_POLL_MS;
@@ -167,7 +168,47 @@
     });
   }
 
-  function setScore(url) {
+  function scoreMeta(ground) {
+    var list = (ground && ground.score_overlays) || [];
+    var i;
+    var fallback = null;
+    for (i = 0; i < list.length; i++) {
+      if (!list[i]) continue;
+      if (list[i].url === ground.score_url) return list[i];
+      if (list[i].active) fallback = list[i];
+    }
+    return fallback;
+  }
+
+  function scoreWidthOf(ground) {
+    var width = ground && ground.layout && ground.layout.score && ground.layout.score.width;
+    if (width == null || width === "") return 1;
+    width = Number(width);
+    if (!isFinite(width)) return 1;
+    if (width < 0.5) return 0.5;
+    if (width > 1) return 1;
+    return width;
+  }
+
+  function fitScore(ground) {
+    var slot = document.getElementById("score-slot");
+    var frame = document.getElementById("score-frame");
+    var scale;
+    var width;
+    var sx;
+    var sy;
+    if (!slot || !frame || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
+    scale = window.PulsePlayScore.frameScale(ground ? ground.score_url : "", scoreMeta(ground));
+    width = scoreWidthOf(ground);
+    sx = String(Math.round(scale * width * 1000) / 1000);
+    sy = String(Math.round(scale * 1000) / 1000);
+    if (slot.style.getPropertyValue("--score-sx") !== sx) slot.style.setProperty("--score-sx", sx);
+    if (slot.style.getPropertyValue("--score-sy") !== sy) slot.style.setProperty("--score-sy", sy);
+  }
+
+  function setScore(ground) {
+    var url = ground ? ground.score_url : "";
+    fitScore(ground);
     window.PulsePlayScore.attach({
       iframe: document.getElementById("score-frame"),
       fallback: document.getElementById("score-fallback"),
@@ -476,21 +517,22 @@
 
   function clearExternalTimer() {
     externalToken += 1;
+    externalPlay = "";
     if (externalTimer) {
       window.clearTimeout(externalTimer);
       externalTimer = null;
     }
   }
 
-  function externalVideo(doc, ground) {
+  function externalPlayKey(doc, ground) {
     var ad;
-    if (!ground || ground.external_video_audio !== true) return false;
-    if (ground.mode !== "ad" || !ground.active_ad) return false;
+    if (!ground) return "";
     ad = findAd(doc, ground.active_ad);
-    return !!(ad && !isImageAd(ad));
+    return String(ground.active_ad || "") + "@" + String(ground.updated_at || "") + "@" +
+      (ad && ad.duration_seconds != null ? String(ad.duration_seconds) : "");
   }
 
-  function showExternal(adId) {
+  function armExternalReturn(adId) {
     var ad = findAd(currentDoc, adId);
     var ground = findGround(currentDoc);
     var seconds;
@@ -498,11 +540,7 @@
     var token;
     var key;
     clearExternalTimer();
-    document.body.classList.add("mode-external");
-    document.body.classList.remove("mode-image");
-    setMode("ad");
-    hideStills();
-    parkOthers(null);
+    externalPlay = externalPlayKey(currentDoc, ground);
     if (!ad || !isFinite(Number(ad.duration_seconds)) || Number(ad.duration_seconds) <= 0) {
       if (window.console && console.log) console.log("Pulse Play external video has no duration");
       return;
@@ -525,11 +563,66 @@
       live.active_ad = null;
       appliedSig = "";
       shownKey = "";
+      externalPlay = "";
       document.body.classList.remove("mode-external");
       apply(currentDoc);
-      if (store.returnToLogos) store.returnToLogos(live.id, adId, seenAt, function () {});
-      else if (store.write) store.write(currentDoc, function () {});
+      finishExternalReturn(live.id, adId, seenAt, key);
     }, Math.round(seconds * 1000));
+  }
+
+  function finishExternalReturn(groundId, adId, seenAt, key) {
+    function again() {
+      var live = currentDoc ? findGround(currentDoc) : null;
+      if (!live) return;
+      if (live.mode === "ad" && (live.active_ad !== adId || String(live.updated_at || "") !== String(seenAt || ""))) return;
+      if (externalSent === key) return;
+      externalSent = key;
+      finishExternalReturn(groundId, adId, seenAt, key);
+    }
+    if (store.returnToLogos) {
+      store.returnToLogos(groundId, adId, seenAt, function (err) {
+        if (!err) return;
+        externalSent = "";
+        window.setTimeout(again, 2000);
+      });
+      return;
+    }
+    if (store.write) {
+      store.write(currentDoc, function (err) {
+        if (!err) return;
+        externalSent = "";
+        window.setTimeout(again, 2000);
+      });
+    }
+  }
+
+  function rearmExternal(doc, ground) {
+    var play;
+    if (!externalVideo(doc, ground)) return;
+    if (!document.body.classList.contains("mode-external")) return;
+    play = externalPlayKey(doc, ground);
+    if (play === externalPlay) return;
+    armExternalReturn(ground.active_ad);
+  }
+
+  function externalVideo(doc, ground) {
+    var ad;
+    if (!ground || ground.external_video_audio !== true) return false;
+    if (ground.mode !== "ad" || !ground.active_ad) return false;
+    ad = findAd(doc, ground.active_ad);
+    return !!(ad && !isImageAd(ad));
+  }
+
+  function showExternal(adId) {
+    var already = document.body.classList.contains("mode-external") && shownKey === "ext:" + adId;
+    if (!already) {
+      document.body.classList.add("mode-external");
+      document.body.classList.remove("mode-image");
+      setMode("ad");
+      hideStills();
+      parkOthers(null);
+    }
+    armExternalReturn(adId);
   }
 
   function showLogos() {
@@ -637,14 +730,17 @@
     var bar = document.getElementById("subscribe-ticker");
     var bottom;
     var height;
+    var sy;
     var next;
     if (!score || !bar) return;
     bottom = parseFloat(score.style.bottom);
     height = parseFloat(score.style.height);
+    sy = parseFloat(score.style.getPropertyValue("--score-sy"));
+    if (!sy) sy = 1;
     if (isNaN(bottom) || isNaN(height)) return;
-    /* Sit above the painted score. The iframe is scaled 2.15 from its
-       bottom edge in CSS; this does not move the score slot. */
-    next = Math.round(bottom + height * 2.15 + 10) + "px";
+    /* Sit above the painted score. --score-sy is 2.15 for the short
+       overlay.cricclubs.com bar and 1 for a full-size page. */
+    next = Math.round(bottom + height * sy + 10) + "px";
     if (bar.style.bottom !== next) bar.style.bottom = next;
   }
 
@@ -778,6 +874,7 @@
     placeTicker();
     sig = visualSig(doc, ground);
     if (sig === appliedSig) {
+      rearmExternal(doc, ground);
       nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;
       if (nextPoll < 2000) nextPoll = 2000;
       if (nextPoll > 300000) nextPoll = 300000;
@@ -815,8 +912,8 @@
         score: document.getElementById("score-slot")
       });
     }
+    setScore(ground);
     placeTicker();
-    setScore(ground.score_url);
     nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;
     if (nextPoll < 2000) nextPoll = 2000;
     if (nextPoll > 300000) nextPoll = 300000;
@@ -828,9 +925,9 @@
     else if (ground.mode === "ad" && ground.active_ad) nextKey = "ad:" + ground.active_ad;
     else nextKey = "logos";
     if (nextKey === shownKey) {
-      /* A duration that arrives after the transparent ad started still
-         needs its return timer. A timer that is already running stays. */
-      if (nextKey.indexOf("ext:") === 0 && !externalTimer) showExternal(ground.active_ad);
+      /* Same picture as last time. A new tap of this ad, or a duration
+         that showed up late, still restarts the return timer. */
+      if (nextKey.indexOf("ext:") === 0) rearmExternal(doc, ground);
       return;
     }
     if (nextKey.indexOf("ext:") !== 0) ensureAds(doc, ground);

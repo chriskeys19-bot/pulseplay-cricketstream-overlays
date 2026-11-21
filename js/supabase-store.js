@@ -381,6 +381,87 @@
       });
     }
 
+    function groundRow(ground, live) {
+      var row = {
+        id: ground.id,
+        name: ground.name,
+        short_link: ground.short_link,
+        resolved_url: ground.resolved_url,
+        device: ground.device,
+        score_url: ground.score_url,
+        logo_age_id: emptyToNull(ground.logos && ground.logos.age_group_sponsor),
+        logo_tournament_id: emptyToNull(ground.logos && ground.logos.tournament),
+        logo_cricketcraze_id: emptyToNull(ground.logos && ground.logos.cricketcraze),
+        layout: ground.layout || null,
+        external_video_audio: ground.external_video_audio === true,
+        score_overlays: ground.score_overlays || [],
+        show_subscribe_ticker: ground.show_subscribe_ticker !== false,
+        ticker_trigger_at: ground.ticker_trigger_at || null
+      };
+      if (live) {
+        row.mode = ground.mode || "logos_score";
+        row.active_ad_id = emptyToNull(ground.active_ad);
+        row.updated_at = ground.updated_at;
+      }
+      return row;
+    }
+
+    function groundFromRow(row, adIds) {
+      return {
+        id: row.id,
+        name: row.name,
+        short_link: row.short_link,
+        resolved_url: row.resolved_url,
+        device: row.device,
+        mode: row.mode,
+        active_ad: row.active_ad_id,
+        score_url: row.score_url,
+        logos: {
+          age_group_sponsor: row.logo_age_id || "",
+          tournament: row.logo_tournament_id || "",
+          cricketcraze: row.logo_cricketcraze_id || ""
+        },
+        ad_ids: adIds || [],
+        layout: row.layout || null,
+        external_video_audio: row.external_video_audio === true,
+        score_overlays: row.score_overlays || [],
+        show_subscribe_ticker: row.show_subscribe_ticker !== false,
+        ticker_trigger_at: row.ticker_trigger_at || null,
+        updated_at: row.updated_at
+      };
+    }
+
+    function writeGround(ground, options, callback) {
+      if (typeof options === "function") {
+        callback = options;
+        options = {};
+      }
+      options = options || {};
+      withToken(function (err, token) {
+        var links = [];
+        var j;
+        if (err) { callback(err); return; }
+        if (!ground || !ground.id) {
+          callback(new Error("Saved 0 rows. This ground has no id."));
+          return;
+        }
+        for (j = 0; j < (ground.ad_ids || []).length; j++) {
+          links.push({ ground_id: ground.id, asset_id: ground.ad_ids[j], position: j });
+        }
+        rest("pp_grounds?on_conflict=id", "POST", token, [groundRow(ground, !!options.live)], "resolution=merge-duplicates,return=representation", function (saveErr, rows) {
+          if (saveErr) { callback(saveErr); return; }
+          if (!rows || !rows.length) {
+            callback(new Error("Saved 0 rows. This account may not be allowed to update " + (ground.name || ground.id) + "."));
+            return;
+          }
+          replaceLinks(links, [ground.id], token, function (linkErr) {
+            if (linkErr) { callback(linkErr); return; }
+            callback(null, groundFromRow(rows[0], ground.ad_ids), rows.length);
+          });
+        });
+      });
+    }
+
     function returnToLogos(groundId, adId, seenAt, callback) {
       rest("rpc/pulseplay_return_to_logos", "POST", key, {
         p_ground_id: groundId,
@@ -573,6 +654,7 @@
     return {
       read: read,
       write: write,
+      writeGround: writeGround,
       returnToLogos: returnToLogos,
       reset: reset,
       subscribe: subscribe,

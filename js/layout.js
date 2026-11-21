@@ -29,19 +29,25 @@
     return n;
   }
 
-  function slotOrDefault(raw) {
+  function slotOrDefault(raw, name) {
     var src = raw || {};
-    return {
+    var slot = {
       scale: clamp(src.scale == null ? 1 : src.scale, 0.25, 2),
       x: Math.round(clamp(src.x || 0, -400, 400)),
       y: Math.round(clamp(src.y || 0, -400, 400))
     };
+    var width;
+    if (name === "score" && src.width != null && src.width !== "") {
+      width = clamp(src.width, 0.5, 1);
+      if (Math.abs(width - 1) > 0.001) slot.width = Math.round(width * 1000) / 1000;
+    }
+    return slot;
   }
 
   function normalize(raw) {
     var out = {};
     var i;
-    for (i = 0; i < SLOTS.length; i++) out[SLOTS[i]] = slotOrDefault(raw && raw[SLOTS[i]]);
+    for (i = 0; i < SLOTS.length; i++) out[SLOTS[i]] = slotOrDefault(raw && raw[SLOTS[i]], SLOTS[i]);
     return out;
   }
 
@@ -56,6 +62,7 @@
     for (i = 0; i < SLOTS.length; i++) {
       slot = layout[SLOTS[i]];
       if (slot.scale !== 1 || slot.x !== 0 || slot.y !== 0) return false;
+      if (slot.width != null && Math.abs(slot.width - 1) > 0.001) return false;
     }
     return true;
   }

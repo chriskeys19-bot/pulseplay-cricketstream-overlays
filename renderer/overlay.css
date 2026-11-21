@@ -127,7 +127,7 @@ body.mode-ad #subscribe-ticker {
   border: 0;
   background: transparent;
   color-scheme: normal;
-  transform: scale(2.15);
+  transform: scale(var(--score-sx, 1), var(--score-sy, 1));
   transform-origin: bottom center;
 }
 #score-fallback {

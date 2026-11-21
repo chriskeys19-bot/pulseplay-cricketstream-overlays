@@ -104,7 +104,13 @@
       "properties": {
         "scale": { "type": "number", "minimum": 0.25, "maximum": 2 },
         "x": { "type": "number" },
-        "y": { "type": "number" }
+        "y": { "type": "number" },
+        "width": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1,
+          "description": "Score only. Horizontal scale of the iframe around its center. Omit it, or use 1, for the full slot width. The iframe's layout width does not change."
+        }
       }
     },
     "logos": {
@@ -182,7 +188,11 @@
               "id": { "type": "string", "minLength": 1 },
               "name": { "type": "string", "minLength": 1 },
               "url": { "type": "string", "minLength": 1 },
-              "active": { "type": "boolean" }
+              "active": { "type": "boolean" },
+              "full_size": {
+                "type": "boolean",
+                "description": "True when this score page already draws a full-size bar (1x). False forces the compact 2.15 scale used for overlay.cricclubs.com. Omit it to decide from the host."
+              }
             }
           }
         },

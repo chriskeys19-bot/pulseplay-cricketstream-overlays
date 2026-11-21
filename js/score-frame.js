@@ -113,5 +113,40 @@
     ghost.src = safe;
   }
 
-  global.PulsePlayScore = { attach: attach };
+  function hostOf(url) {
+    var anchor = document.createElement("a");
+    var host;
+    anchor.href = url || "";
+    host = (anchor.hostname || "").toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") return "";
+    return host;
+  }
+
+  function pathOf(url) {
+    var anchor = document.createElement("a");
+    anchor.href = url || "";
+    return (anchor.pathname || "").toLowerCase();
+  }
+
+  /*
+   * 2.15 suits the short overlay.cricclubs.com bar. A static.cricclubs.com
+   * ccindex page already draws a full-size bar, so it stays at 1.
+   * full_size true forces 1. full_size false forces the compact 2.15
+   * (for a short link whose target we cannot see).
+   */
+  function frameScale(url, meta) {
+    var host;
+    var path;
+    var text = String(url || "");
+    if (meta && meta.full_size === true) return 1;
+    if (meta && meta.full_size === false) return 2.15;
+    host = hostOf(text);
+    path = pathOf(text);
+    if (host === "overlay.cricclubs.com" || text.indexOf("overlay.cricclubs.com") !== -1) return 2.15;
+    if (host === "static.cricclubs.com") return 1;
+    if (path.indexOf("ccindex") !== -1 || path.indexOf("/overlay-cc/") !== -1) return 1;
+    return 1;
+  }
+
+  global.PulsePlayScore = { attach: attach, frameScale: frameScale };
 })(window);

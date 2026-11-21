@@ -280,6 +280,46 @@
       });
     }
 
+    function writeGround(ground, options, callback) {
+      var doc;
+      var i;
+      var found = false;
+      var saved;
+      if (typeof options === "function") {
+        callback = options;
+        options = {};
+      }
+      options = options || {};
+      if (!ground || !ground.id) {
+        callback(new Error("Saved 0 rows. This ground has no id."));
+        return;
+      }
+      doc = readLocal();
+      if (!doc) {
+        doc = { version: 3, poll_ms: window.PulsePlayStore.DEFAULT_POLL_MS, auto_return_on_end: true, assets: [], grounds: [] };
+      }
+      saved = {};
+      for (i in ground) {
+        if (ground.hasOwnProperty(i)) saved[i] = ground[i];
+      }
+      for (i = 0; i < (doc.grounds || []).length; i++) {
+        if (doc.grounds[i].id !== ground.id) continue;
+        if (!options.live) {
+          saved.mode = doc.grounds[i].mode;
+          saved.active_ad = doc.grounds[i].active_ad;
+          saved.updated_at = doc.grounds[i].updated_at;
+        }
+        doc.grounds[i] = saved;
+        found = true;
+      }
+      if (!doc.grounds) doc.grounds = [];
+      if (!found) doc.grounds.push(saved);
+      write(doc, function (err) {
+        if (err) callback(err);
+        else callback(null, saved, 1);
+      });
+    }
+
     function deleteBlob(key, callback) {
       var id = key || "";
       if (id.indexOf("idb:") === 0) id = id.substring(4);
@@ -293,6 +333,7 @@
     return {
       read: read,
       write: write,
+      writeGround: writeGround,
       reset: reset,
       subscribe: subscribe,
       mediaUrl: mediaUrl,
