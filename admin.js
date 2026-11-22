@@ -16,7 +16,7 @@
   var logoSig = null;
   var setupSig = null;
   var controlsSig = "";
-  var idTouched = false;
+  var setupSection = "controls";
   var polling = false;
   var POLL_MIN_SECONDS = 2;
   var POLL_MAX_SECONDS = 300;
@@ -1574,14 +1574,23 @@
   }
 
   function showTab(name) {
-    var panels = ["controls", "center", "library", "logos", "setup", "ticker", "broadcasts"];
+    var setupPanels = ["controls", "center", "library", "logos", "setup", "ticker"];
+    var main = name === "streams" || name === "broadcasts" ? name : "setup";
+    var section = main === "setup" ? (name === "setup-home" ? setupSection : name) : "";
     var i;
     var panel;
     var tab;
-    for (i = 0; i < panels.length; i++) {
-      panel = document.getElementById("panel-" + panels[i]);
-      tab = document.getElementById("tab-" + panels[i]);
-      if (panels[i] === name) {
+    if (main === "setup" && section) setupSection = section;
+    setTabState("tab-streams", main === "streams");
+    setTabState("tab-setup-home", main === "setup");
+    setTabState("tab-broadcasts", main === "broadcasts");
+    document.getElementById("panel-streams").classList.toggle("is-off", main !== "streams");
+    document.getElementById("panel-broadcasts").classList.toggle("is-off", main !== "broadcasts");
+    document.getElementById("setup-subnav").classList.toggle("is-off", main !== "setup");
+    for (i = 0; i < setupPanels.length; i++) {
+      panel = document.getElementById("panel-" + setupPanels[i]);
+      tab = document.getElementById("tab-" + setupPanels[i]);
+      if (main === "setup" && setupPanels[i] === setupSection) {
         panel.classList.remove("is-off");
         tab.classList.add("is-active");
       } else {
@@ -1589,12 +1598,20 @@
         tab.classList.remove("is-active");
       }
     }
-    if (name === "center") renderCenter();
-    if (name === "library") renderLibrary();
-    if (name === "logos") renderLogoLibrary();
-    if (name === "setup") renderSetupList();
-    if (name === "ticker") loadTickerForm();
-    if (name === "broadcasts" && window.PulsePlayBroadcasts) window.PulsePlayBroadcasts.show();
+    if (main === "setup" && setupSection === "center") renderCenter();
+    if (main === "setup" && setupSection === "library") renderLibrary();
+    if (main === "setup" && setupSection === "logos") renderLogoLibrary();
+    if (main === "setup" && setupSection === "setup") renderSetupList();
+    if (main === "setup" && setupSection === "ticker") loadTickerForm();
+    if (main === "streams" && window.PulsePlayStreams) window.PulsePlayStreams.show();
+    if (main === "broadcasts" && window.PulsePlayBroadcasts) window.PulsePlayBroadcasts.show();
+  }
+
+  function setTabState(id, on) {
+    var tab = document.getElementById(id);
+    if (!tab) return;
+    if (on) tab.classList.add("is-active");
+    else tab.classList.remove("is-active");
   }
 
   function queryValue(name) {
@@ -2291,6 +2308,8 @@
     });
   }
 
+  document.getElementById("tab-streams").onclick = function () { showTab("streams"); };
+  document.getElementById("tab-setup-home").onclick = function () { showTab("setup-home"); };
   document.getElementById("tab-controls").onclick = function () { showTab("controls"); };
   document.getElementById("tab-center").onclick = function () { showTab("center"); };
   document.getElementById("tab-library").onclick = function () { showTab("library"); };
@@ -2503,6 +2522,9 @@
           boot();
         }
         maybeOpenBroadcasts();
+        if (window.PulsePlayStreams && !document.getElementById("panel-streams").classList.contains("is-off")) {
+          window.PulsePlayStreams.show();
+        }
       });
     });
   }
@@ -2556,6 +2578,7 @@
     hideSignIn();
     boot();
     maybeOpenBroadcasts();
+    if (window.PulsePlayStreams) window.PulsePlayStreams.show();
   } else if (!window.supabase || !window.supabase.createClient) {
     showSignIn();
     showSignError("Google sign-in did not load. Email and password still work if this message is a network blip — reload to try Google again.");
@@ -2588,4 +2611,8 @@
       admitSession(session);
     });
   }
+  window.PulsePlayAdmin = {
+    openGround: openGround,
+    grounds: function () { return currentDoc && currentDoc.grounds ? currentDoc.grounds : []; }
+  };
 })();
