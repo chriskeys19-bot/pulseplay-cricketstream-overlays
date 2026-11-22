@@ -40,6 +40,7 @@
       <button type="button" id="tab-logos" class="tab">Logo Library</button>
       <button type="button" id="tab-setup" class="tab">Ground setup</button>
       <button type="button" id="tab-ticker" class="tab">Subscribe ticker</button>
+      <button type="button" id="tab-broadcasts" class="tab">Broadcasts</button>
       <button type="button" id="btn-sign-out" class="btn-text is-off">Sign out</button>
     </nav>
 
@@ -267,6 +268,27 @@
       </form>
     </section>
 
+    <section id="panel-broadcasts" class="is-off" aria-label="Broadcasts">
+      <div class="center-head">
+        <h2>Broadcasts</h2>
+        <p>Every live broadcast on the CricketCrazeUSA YouTube channel. Start and End change that broadcast on YouTube. They do not change grounds, ads, or the overlay.</p>
+      </div>
+      <div class="broadcast-connect">
+        <p id="broadcast-connection">Checking the YouTube connection…</p>
+        <div class="broadcast-actions">
+          <button type="button" id="broadcast-connect">Connect YouTube</button>
+          <button type="button" id="broadcast-test">Test connection</button>
+        </div>
+      </div>
+      <p id="broadcast-notice" class="broadcast-notice is-off" role="status"></p>
+      <div id="broadcast-filters" class="broadcast-filters">
+        <button type="button" data-filter="upcoming" aria-pressed="true">Today &amp; upcoming</button>
+        <button type="button" data-filter="live" aria-pressed="false">Live now</button>
+        <button type="button" data-filter="ended" aria-pressed="false">Recent ended</button>
+      </div>
+      <div id="broadcast-list"></div>
+    </section>
+
     <footer class="foot">
       <p>Mock adapter. Config is localStorage. Uploads are IndexedDB blobs in this browser. A YoloBox will not see either until Supabase is connected.</p>
     </footer>
@@ -279,6 +301,8 @@
   <script src="js/supabase-store.js"></script>
   <script src="js/score-frame.js"></script>
   <script src="js/layout.js"></script>
+  <script src="js/youtube-broadcasts.js"></script>
+  <script src="js/broadcasts.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>
