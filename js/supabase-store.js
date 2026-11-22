@@ -238,7 +238,9 @@
           score_overlays: row.score_overlays || [],
           show_subscribe_ticker: row.show_subscribe_ticker !== false,
           ticker_trigger_at: row.ticker_trigger_at || null,
-          updated_at: row.updated_at
+          updated_at: row.updated_at,
+          ad_started_at: row.ad_started_at || null,
+          expires_at: row.expires_at || null
         };
         byGround[ground.id] = ground;
         grounds.push(ground);
@@ -427,7 +429,9 @@
         score_overlays: row.score_overlays || [],
         show_subscribe_ticker: row.show_subscribe_ticker !== false,
         ticker_trigger_at: row.ticker_trigger_at || null,
-        updated_at: row.updated_at
+        updated_at: row.updated_at,
+        ad_started_at: row.ad_started_at || null,
+        expires_at: row.expires_at || null
       };
     }
 

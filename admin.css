@@ -149,6 +149,23 @@ input[type="number"] { width: 120px; min-width: 120px; }
   cursor: pointer;
 }
 .card--ad { border-color: #e4b75a; box-shadow: inset 5px 0 0 #e4b75a; }
+.card--stuck { border-color: #c44; box-shadow: inset 5px 0 0 #c44; }
+.card__stuck {
+  display: none;
+  float: right;
+  clear: right;
+  margin: 4px 0 0;
+  padding: 2px 8px;
+  background: #c44;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.card__stuck.is-on { display: inline-block; }
+.card__stuck--info { background: #8a5a00; }
+.card__reset { margin: 8px 0 0; }
+.center-actions { margin: 8px 0 0; }
 .card__head { overflow: hidden; }
 .card__name { float: left; width: 72%; margin: 0; font-size: 18px; line-height: 1.25; }
 .pill {

@@ -278,6 +278,81 @@
     return "View 1: Logos + Score";
   }
 
+  var STUCK_VIDEO_BUFFER_SECONDS = 3;
+  var STUCK_ANY_MS = 10 * 60 * 1000;
+
+  function adStartMs(ground) {
+    var n = Date.parse((ground && (ground.ad_started_at || ground.updated_at)) || "");
+    return isNaN(n) ? 0 : n;
+  }
+
+  function isVideoStuck(doc, ground) {
+    var ad;
+    var dur;
+    var start;
+    if (!doc || !ground || ground.mode !== "ad" || !ground.active_ad) return false;
+    ad = findAd(doc, ground.active_ad);
+    if (!ad || isImageMedia(ad)) return false;
+    dur = Number(ad.duration_seconds);
+    if (!isFinite(dur) || dur <= 0) return false;
+    start = adStartMs(ground);
+    if (!start) return false;
+    return Date.now() > start + (dur + STUCK_VIDEO_BUFFER_SECONDS) * 1000;
+  }
+
+  function isInformationalStuck(doc, ground) {
+    var start;
+    if (!doc || !ground || ground.mode !== "ad" || !ground.active_ad) return false;
+    start = adStartMs(ground);
+    if (!start) return false;
+    return Date.now() > start + STUCK_ANY_MS;
+  }
+
+  function isStuck(doc, ground) {
+    return isVideoStuck(doc, ground) || isInformationalStuck(doc, ground);
+  }
+
+  function stuckGrounds(doc) {
+    var out = [];
+    var i;
+    var ground;
+    if (!doc || !doc.grounds) return out;
+    for (i = 0; i < doc.grounds.length; i++) {
+      ground = doc.grounds[i];
+      if (isStuck(doc, ground)) out.push(ground);
+    }
+    return out;
+  }
+
+  function resetGroundToLogos(groundId) {
+    tapControl(groundId, { mode: "logos_score", active_ad: null });
+  }
+
+  function resetAllStuck() {
+    var list = stuckGrounds(currentDoc);
+    var i;
+    if (!list.length) {
+      showBanner("No stuck ads to reset.", "ok");
+      return;
+    }
+    for (i = 0; i < list.length; i++) resetGroundToLogos(list[i].id);
+    showBanner("Reset " + list.length + " stuck ground" + (list.length === 1 ? "" : "s") + " to Logos + Score.", "ok");
+  }
+
+  function paintStuckHint() {
+    var node = document.getElementById("stuck-hint");
+    var list;
+    var n;
+    if (!node) return;
+    list = stuckGrounds(currentDoc);
+    n = list.length;
+    if (!n) {
+      setText(node, "");
+      return;
+    }
+    setText(node, n + " ground" + (n === 1 ? " is" : "s are") + " marked stuck. Video ads past their length, or any ad on for more than 10 minutes, can be reset here. Image ads are not cleared automatically.");
+  }
+
   function resolvedFor(id, device) {
     return PAGES + "/renderer/" + device + ".html?ground=" + encodeURIComponent(id) + "&device=" + device;
   }
@@ -772,11 +847,33 @@
 
   function paintCard(card, ground) {
     var mode = childByClass(card, "card__mode");
+    var badge = childByClass(card, "card__stuck");
+    var reset = childByClass(card, "card__reset");
+    var videoStuck = isVideoStuck(currentDoc, ground);
+    var infoStuck = !videoStuck && isInformationalStuck(currentDoc, ground);
     if (ground.mode === "ad") card.classList.add("card--ad");
     else card.classList.remove("card--ad");
+    if (videoStuck || infoStuck) card.classList.add("card--stuck");
+    else card.classList.remove("card--stuck");
     setText(childByClass(card, "card__name"), ground.name);
     setText(mode, modeLabel(currentDoc, ground));
     setText(childByClass(card, "card__time"), "Updated " + formatTime(ground.updated_at));
+    if (badge) {
+      if (videoStuck) {
+        setText(badge, "Stuck");
+        badge.className = "card__stuck is-on";
+      } else if (infoStuck) {
+        setText(badge, "On air 10+ min");
+        badge.className = "card__stuck card__stuck--info is-on";
+      } else {
+        setText(badge, "");
+        badge.className = "card__stuck";
+      }
+    }
+    if (reset) {
+      if (ground.mode === "ad") reset.classList.remove("is-off");
+      else reset.classList.add("is-off");
+    }
     syncCardStill(card, ground);
     syncCardScore(card, ground);
   }
@@ -856,6 +953,9 @@
     setText(pill, ground.device === "mini" ? "Mini" : "Pro");
     head.appendChild(name);
     head.appendChild(pill);
+    var badge = document.createElement("span");
+    badge.className = "card__stuck";
+    head.appendChild(badge);
     mode.className = "card__mode";
     shortP.className = "card__short";
     shortA.href = ground.short_link;
@@ -887,8 +987,17 @@
     setText(scoreA, ground.score_url);
     scoreP.appendChild(document.createTextNode("Score URL: "));
     scoreP.appendChild(scoreA);
+    var reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "card__reset is-off";
+    setText(reset, "Logos + Score");
+    reset.onclick = function (event) {
+      if (event.stopPropagation) event.stopPropagation();
+      resetGroundToLogos(ground.id);
+    };
     card.appendChild(head);
     card.appendChild(mode);
+    card.appendChild(reset);
     card.appendChild(shortP);
     card.appendChild(time);
     card.appendChild(slot);
@@ -937,9 +1046,11 @@
         emptyNote.className = "hint";
         setText(emptyNote, "No grounds yet. Add the first one in Ground setup. Overlay pages stay transparent until a ground exists.");
         grid.appendChild(emptyNote);
+        paintStuckHint();
         return;
       }
       for (i = 0; i < currentDoc.grounds.length; i++) grid.appendChild(buildCard(currentDoc.grounds[i]));
+      paintStuckHint();
       return;
     }
     for (i = 0; i < currentDoc.grounds.length; i++) {
@@ -952,6 +1063,7 @@
       }
       if (card) paintCard(card, ground);
     }
+    paintStuckHint();
   }
 
   function groundIds() {
@@ -2382,6 +2494,13 @@
     onLogoFile(this.files && this.files[0]);
   };
   document.getElementById("logo-form").onsubmit = onAddLogo;
+  if (document.getElementById("btn-reset-stuck")) {
+    document.getElementById("btn-reset-stuck").onclick = function () { resetAllStuck(); };
+  }
+  window.setInterval(function () {
+    if (!currentDoc || !currentDoc.grounds) return;
+    renderCenter();
+  }, 15000);
   document.getElementById("btn-reset").onclick = function () {
     if (!window.confirm("Replace this browser's mock config and delete uploaded files?")) return;
     store.reset(function (err, doc) {

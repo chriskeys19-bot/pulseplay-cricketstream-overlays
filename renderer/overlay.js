@@ -344,6 +344,80 @@
     });
   }
 
+  var watchHold = null;
+  var watchTimer = null;
+
+  function clearWatchdog() {
+    watchHold = null;
+    if (watchTimer) {
+      window.clearInterval(watchTimer);
+      watchTimer = null;
+    }
+  }
+
+  function adStartMs(ground) {
+    var n = Date.parse((ground && (ground.ad_started_at || ground.updated_at)) || "");
+    return isNaN(n) ? 0 : n;
+  }
+
+  function armWatchdog(doc, ground) {
+    var ad;
+    var seconds;
+    var started;
+    if (!ground || ground.mode !== "ad" || !ground.active_ad) {
+      clearWatchdog();
+      return;
+    }
+    ad = findAd(doc, ground.active_ad);
+    if (!ad || isImageAd(ad)) {
+      clearWatchdog();
+      return;
+    }
+    seconds = Number(ad.duration_seconds);
+    if (!isFinite(seconds) || seconds <= 0) {
+      clearWatchdog();
+      return;
+    }
+    started = adStartMs(ground);
+    if (!started) started = Date.now();
+    watchHold = {
+      groundId: ground.id,
+      adId: ground.active_ad,
+      seenAt: ground.updated_at,
+      startedAt: started,
+      until: started + Math.round((seconds + 3) * 1000)
+    };
+    if (!watchTimer) watchTimer = window.setInterval(tickWatchdog, 2000);
+  }
+
+  function tickWatchdog() {
+    var live;
+    var hold = watchHold;
+    if (!hold || !currentDoc) return;
+    if (Date.now() < hold.until) return;
+    live = findGround(currentDoc);
+    if (!live || live.id !== hold.groundId) {
+      clearWatchdog();
+      return;
+    }
+    if (live.mode !== "ad" || live.active_ad !== hold.adId) {
+      clearWatchdog();
+      return;
+    }
+    if (String(live.updated_at || "") !== String(hold.seenAt || "")) {
+      armWatchdog(currentDoc, live);
+      return;
+    }
+    returnHold = {
+      groundId: live.id,
+      adId: hold.adId,
+      seenAt: hold.seenAt
+    };
+    clearWatchdog();
+    apply(currentDoc);
+    persistReturn();
+  }
+
   function onEnded(adId) {
     var ad;
     var ground;
@@ -928,6 +1002,7 @@
       /* Same picture as last time. A new tap of this ad, or a duration
          that showed up late, still restarts the return timer. */
       if (nextKey.indexOf("ext:") === 0) rearmExternal(doc, ground);
+      armWatchdog(doc, ground);
       return;
     }
     if (nextKey.indexOf("ext:") !== 0) ensureAds(doc, ground);
@@ -935,6 +1010,7 @@
     if (nextKey === "logos") showLogos();
     else if (nextKey.indexOf("ext:") === 0) showExternal(ground.active_ad);
     else showAd(ground.active_ad);
+    armWatchdog(doc, ground);
   }
 
   function deliver(doc) {

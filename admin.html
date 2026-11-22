@@ -123,7 +123,9 @@
     <section id="panel-center" class="is-off" aria-label="Command Center">
       <div class="center-head">
         <h2>Command Center</h2>
-        <p>One card per ground. The score strip iframes that ground's CricClubs overlay URL, the same <code>score_url</code> the renderer uses. Cards in an ad are highlighted. Click a card for its controls.</p>
+        <p>One card per ground. The score strip iframes that ground's CricClubs overlay URL, the same <code>score_url</code> the renderer uses. Cards in an ad are highlighted. Click a card for its controls. A red <strong>Stuck</strong> badge means a video ad is past its length. An image ad that has been on for more than 10 minutes gets an informational badge; images stay until you switch them.</p>
+        <p class="center-actions"><button type="button" id="btn-reset-stuck">Reset all stuck</button></p>
+        <p class="hint" id="stuck-hint"></p>
       </div>
       <div id="card-grid" class="card-grid"></div>
     </section>
