@@ -1687,7 +1687,9 @@
 
   function showTab(name) {
     var setupPanels = ["controls", "center", "library", "logos", "setup", "ticker"];
-    var main = name === "streams" || name === "broadcasts" ? name : "setup";
+    var main;
+    if (accessRole === "operator") name = "streams";
+    main = name === "streams" || name === "broadcasts" || name === "access" ? name : "setup";
     var section = main === "setup" ? (name === "setup-home" ? setupSection : name) : "";
     var i;
     var panel;
@@ -1696,8 +1698,10 @@
     setTabState("tab-streams", main === "streams");
     setTabState("tab-setup-home", main === "setup");
     setTabState("tab-broadcasts", main === "broadcasts");
+    setTabState("tab-access", main === "access");
     document.getElementById("panel-streams").classList.toggle("is-off", main !== "streams");
     document.getElementById("panel-broadcasts").classList.toggle("is-off", main !== "broadcasts");
+    document.getElementById("panel-access").classList.toggle("is-off", main !== "access");
     document.getElementById("setup-subnav").classList.toggle("is-off", main !== "setup");
     for (i = 0; i < setupPanels.length; i++) {
       panel = document.getElementById("panel-" + setupPanels[i]);
@@ -1717,6 +1721,7 @@
     if (main === "setup" && setupSection === "ticker") loadTickerForm();
     if (main === "streams" && window.PulsePlayStreams) window.PulsePlayStreams.show();
     if (main === "broadcasts" && window.PulsePlayBroadcasts) window.PulsePlayBroadcasts.show();
+    if (main === "access" && window.PulsePlayAccessTab) window.PulsePlayAccessTab.show();
   }
 
   function setTabState(id, on) {
@@ -2429,6 +2434,7 @@
   document.getElementById("tab-setup").onclick = function () { showTab("setup"); };
   document.getElementById("tab-ticker").onclick = function () { showTab("ticker"); };
   document.getElementById("tab-broadcasts").onclick = function () { showTab("broadcasts"); };
+  document.getElementById("tab-access").onclick = function () { showTab("access"); };
   document.getElementById("ground-select").onchange = function () {
     currentId = this.value;
     actionSig = "";
@@ -2600,6 +2606,41 @@
 
   var authClient = null;
   var dashboardStarted = false;
+  var accessRole = "admin";
+
+  function applyAccess(role, divisions) {
+    var operator = role === "operator";
+    var hidden = ["tab-setup-home", "tab-broadcasts", "tab-access"];
+    var i;
+    var node;
+    accessRole = operator ? "operator" : "admin";
+    window.PulsePlayAccess = { role: accessRole, divisions: divisions || [] };
+    for (i = 0; i < hidden.length; i++) {
+      node = document.getElementById(hidden[i]);
+      if (node) node.classList.toggle("is-off", operator);
+    }
+    if (operator) showTab("streams");
+  }
+
+  function enterDashboard(role, divisions) {
+    var intro = document.getElementById("streams-intro");
+    applyAccess(role, divisions);
+    showSignError("");
+    hideSignIn();
+    if (intro) {
+      setText(intro, role === "operator"
+        ? "Your division only. Start and End use the club YouTube connection. Setup and other divisions stay with an admin."
+        : "Today and upcoming CricketCrazeUSA games. Start and End use the same YouTube connection as Broadcasts.");
+    }
+    if (!dashboardStarted) {
+      dashboardStarted = true;
+      boot();
+    }
+    if (role === "admin") maybeOpenBroadcasts();
+    if (window.PulsePlayStreams && !document.getElementById("panel-streams").classList.contains("is-off")) {
+      window.PulsePlayStreams.show();
+    }
+  }
 
   function fullSignOut(done) {
     function clearStore() {
@@ -2630,20 +2671,24 @@
           setText(document.getElementById("not-admin-email"), "Could not check your club role. Sign out and try again.");
           return;
         }
-        if (role !== "admin") {
+        if (role === "admin") {
+          enterDashboard("admin", []);
+          return;
+        }
+        if (!authClient) {
           showNotAdmin(email);
           return;
         }
-        showSignError("");
-        hideSignIn();
-        if (!dashboardStarted) {
-          dashboardStarted = true;
-          boot();
-        }
-        maybeOpenBroadcasts();
-        if (window.PulsePlayStreams && !document.getElementById("panel-streams").classList.contains("is-off")) {
-          window.PulsePlayStreams.show();
-        }
+        authClient.from("pp_operators").select("divisions, active").eq("active", true).then(function (result) {
+          var row = result.data && result.data[0];
+          if (result.error || !row || !row.divisions || !row.divisions.length) {
+            showNotAdmin(email);
+            return;
+          }
+          enterDashboard("operator", row.divisions);
+        }).catch(function () {
+          showNotAdmin(email);
+        });
       });
     });
   }
@@ -2713,6 +2758,16 @@
         flowType: "pkce"
       }
     });
+    var inviteToken = queryValue("token_hash");
+    var inviteType = queryValue("type");
+    if (inviteToken && (inviteType === "magiclink" || inviteType === "invite" || inviteType === "email" || inviteType === "signup")) {
+      window.history.replaceState({}, "", window.location.origin + window.location.pathname);
+      authClient.auth.verifyOtp({ token_hash: inviteToken, type: inviteType }).then(function (result) {
+        if (result && result.error) showSignError("That sign-in link has expired. Ask Ben to resend the invite.");
+      }).catch(function () {
+        showSignError("That sign-in link has expired. Ask Ben to resend the invite.");
+      });
+    }
     authClient.auth.onAuthStateChange(function (event, session) {
       if (event === "SIGNED_OUT") {
         store.signOut(function () {

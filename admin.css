@@ -344,7 +344,9 @@ input, select, textarea, button { font-size: 16px; }
   border-radius: 8px;
 }
 .stream-row p { margin: 4px 0; }
-.stream-actions button { min-height: 44px; }
+.stream-actions button, .access-division button, .access-actions button { min-height: 44px; }
+.access-division { margin: 0 0 14px; }
+.access-division input { display: block; width: 100%; max-width: 420px; min-height: 44px; margin-top: 4px; }
 .subtabs { margin-top: 0; }
 @media (max-width: 720px) {
   .stream-actions button, .broadcast-actions button { display: block; width: 100%; margin: 0 0 8px; }
