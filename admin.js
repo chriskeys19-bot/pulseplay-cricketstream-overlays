@@ -1574,7 +1574,7 @@
   }
 
   function showTab(name) {
-    var panels = ["controls", "center", "library", "logos", "setup", "ticker"];
+    var panels = ["controls", "center", "library", "logos", "setup", "ticker", "broadcasts"];
     var i;
     var panel;
     var tab;
@@ -1594,6 +1594,31 @@
     if (name === "logos") renderLogoLibrary();
     if (name === "setup") renderSetupList();
     if (name === "ticker") loadTickerForm();
+    if (name === "broadcasts" && window.PulsePlayBroadcasts) window.PulsePlayBroadcasts.show();
+  }
+
+  function queryValue(name) {
+    var search = window.location.search;
+    var parts;
+    var i;
+    var pair;
+    var key;
+    var value;
+    if (!search) return "";
+    if (search.charAt(0) === "?") search = search.substring(1);
+    parts = search.split("&");
+    for (i = 0; i < parts.length; i++) {
+      pair = parts[i].split("=");
+      try { key = decodeURIComponent(pair[0] || ""); } catch (e) { key = pair[0] || ""; }
+      if (key !== name) continue;
+      try { value = decodeURIComponent((pair[1] || "").replace(/\+/g, " ")); } catch (e2) { value = pair[1] || ""; }
+      return value;
+    }
+    return "";
+  }
+
+  function maybeOpenBroadcasts() {
+    if (queryValue("tab") === "broadcasts" || queryValue("youtube")) showTab("broadcasts");
   }
 
   function renderAll() {
@@ -2272,6 +2297,7 @@
   document.getElementById("tab-logos").onclick = function () { showTab("logos"); };
   document.getElementById("tab-setup").onclick = function () { showTab("setup"); };
   document.getElementById("tab-ticker").onclick = function () { showTab("ticker"); };
+  document.getElementById("tab-broadcasts").onclick = function () { showTab("broadcasts"); };
   document.getElementById("ground-select").onchange = function () {
     currentId = this.value;
     actionSig = "";
@@ -2476,6 +2502,7 @@
           dashboardStarted = true;
           boot();
         }
+        maybeOpenBroadcasts();
       });
     });
   }
@@ -2528,6 +2555,7 @@
   if (!useSupabase) {
     hideSignIn();
     boot();
+    maybeOpenBroadcasts();
   } else if (!window.supabase || !window.supabase.createClient) {
     showSignIn();
     showSignError("Google sign-in did not load. Email and password still work if this message is a network blip — reload to try Google again.");

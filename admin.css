@@ -299,6 +299,23 @@ legend { color: #c5cebb; font-size: 13px; font-weight: 700; }
   line-height: 1.2;
   padding-top: 18px;
 }
+.broadcast-connect, .broadcast-row {
+  margin: 0 0 12px;
+  padding: 12px;
+  background: #182117;
+  border: 1px solid #31402d;
+  border-radius: 8px;
+}
+.broadcast-day { margin: 18px 0 8px; }
+.broadcast-watch { word-break: break-all; font-family: ui-monospace, monospace; }
+.broadcast-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+.broadcast-filters button[aria-pressed="true"] { background: #e4b75a; color: #2a210c; }
+.broadcast-notice { margin: 8px 0; padding: 10px 12px; background: #2a2416; }
+.broadcast-notice.is-ok { background: #16321a; color: #c8f0c4; }
+.broadcast-notice.is-err { background: #3a1612; color: #ffd0c8; }
+@media (max-width: 720px) {
+  .broadcast-actions button { display: block; width: 100%; margin: 0 0 8px; }
+}
 .foot { margin-top: 22px; color: #c5cebb; font-size: 13px; }
 .sign-in { max-width: 460px; margin: 48px auto; padding: 0 20px; }
 .btn-google {
