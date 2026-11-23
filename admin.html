@@ -34,19 +34,38 @@
     </header>
 
     <nav class="tabs" aria-label="Dashboard">
-      <button type="button" id="tab-controls" class="tab is-active">Ground controls</button>
-      <button type="button" id="tab-center" class="tab">Command Center</button>
-      <button type="button" id="tab-library" class="tab">Ad Library</button>
-      <button type="button" id="tab-logos" class="tab">Logo Library</button>
-      <button type="button" id="tab-setup" class="tab">Ground setup</button>
-      <button type="button" id="tab-ticker" class="tab">Subscribe ticker</button>
+      <button type="button" id="tab-streams" class="tab is-active">Streams</button>
+      <button type="button" id="tab-setup-home" class="tab">Setup</button>
       <button type="button" id="tab-broadcasts" class="tab">Broadcasts</button>
       <button type="button" id="btn-sign-out" class="btn-text is-off">Sign out</button>
     </nav>
 
     <p id="banner" class="banner is-off" role="status"></p>
 
-    <section id="panel-controls">
+    <section id="panel-streams" aria-label="Streams">
+      <div class="center-head">
+        <h2>Streams</h2>
+        <p>Today and upcoming CricketCrazeUSA games. Start and End use the same YouTube connection as Broadcasts.</p>
+      </div>
+      <p id="streams-youtube" class="broadcast-notice is-off" role="status"></p>
+      <div class="stream-filters">
+        <label>Day <select id="streams-day"><option value="upcoming">Today &amp; upcoming</option></select></label>
+        <label>Ground <select id="streams-ground"><option value="">All grounds</option></select></label>
+        <label class="check"><input type="checkbox" id="streams-hide-ended" checked> Hide ended</label>
+      </div>
+      <div id="streams-list"></div>
+    </section>
+
+    <nav id="setup-subnav" class="tabs subtabs is-off" aria-label="Setup">
+      <button type="button" id="tab-controls" class="tab">Ground controls</button>
+      <button type="button" id="tab-center" class="tab">Command Center</button>
+      <button type="button" id="tab-library" class="tab">Ad Library</button>
+      <button type="button" id="tab-logos" class="tab">Logo Library</button>
+      <button type="button" id="tab-setup" class="tab">Ground setup</button>
+      <button type="button" id="tab-ticker" class="tab">Subscribe ticker</button>
+    </nav>
+
+    <section id="panel-controls" class="is-off">
       <div class="status">
         <div class="status__item">
           <p class="k">Ground</p>
@@ -305,6 +324,7 @@
   <script src="js/layout.js"></script>
   <script src="js/youtube-broadcasts.js"></script>
   <script src="js/broadcasts.js"></script>
+  <script src="js/streams.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

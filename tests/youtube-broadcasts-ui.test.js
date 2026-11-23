@@ -26,6 +26,11 @@ test("start more than 15 minutes early names the game, both times, and the strea
   assert.equal(rules.startNeedsConfirm(ROW.scheduledStart, Date.parse("2026-11-26T17:50:00.000Z")), false);
 });
 
+test("8:30 AM Pacific on Nov 26 is 16:30 UTC", () => {
+  assert.equal(rules.zonedLocalToIso("2026-11-26", "8:30 AM", "Pacific"), "2026-11-26T16:30:00.000Z");
+  assert.equal(rules.zonedLocalToIso("2026-11-26", "9:00 AM", "Central"), "2026-11-26T15:00:00.000Z");
+});
+
 test("end always names the game", () => {
   assert.match(rules.endConfirmCopy(ROW).body, /End PSD U13 vs Hawks/);
 });

@@ -12,6 +12,65 @@
   var PACIFIC = "America/Los_Angeles";
   var CHICAGO = "America/Chicago";
 
+    function zonedLocalToIso(dateStr, timeStr, zoneName) {
+      var zone = zoneName === "Central" ? CHICAGO : PACIFIC;
+      var match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(String(timeStr || "").replace(/^\s+|\s+$/g, ""));
+      var hour;
+      var minute;
+      var ap;
+      var parts = String(dateStr || "").split("-");
+      var year;
+      var month;
+      var day;
+      var utc;
+      var i;
+      var got;
+      var delta;
+      if (!match || parts.length !== 3) return null;
+      hour = parseInt(match[1], 10);
+      minute = parseInt(match[2], 10);
+      ap = match[3].toUpperCase();
+      if (ap === "PM" && hour !== 12) hour += 12;
+      if (ap === "AM" && hour === 12) hour = 0;
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+      day = parseInt(parts[2], 10);
+      utc = Date.UTC(year, month - 1, day, hour, minute);
+      for (i = 0; i < 4; i++) {
+        got = zonedParts(new Date(utc), zone);
+        if (!got) return null;
+        delta = Date.UTC(got.year, got.month - 1, got.day, got.hour, got.minute) - Date.UTC(year, month - 1, day, hour, minute);
+        if (delta === 0) break;
+        utc -= delta;
+      }
+      return new Date(utc).toISOString();
+    }
+
+    function zonedParts(date, timeZone) {
+      var parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: timeZone,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).formatToParts(date);
+      var map = {};
+      var i;
+      for (i = 0; i < parts.length; i++) {
+        if (parts[i].type !== "literal") map[parts[i].type] = parts[i].value;
+      }
+      if (!map.year || !map.month || !map.day || map.hour == null || map.minute == null) return null;
+      return {
+        year: parseInt(map.year, 10),
+        month: parseInt(map.month, 10),
+        day: parseInt(map.day, 10),
+        hour: parseInt(map.hour, 10),
+        minute: parseInt(map.minute, 10)
+      };
+    }
+
   function zonedClock(iso, timeZone) {
     var date = new Date(iso);
     var parts;
@@ -179,6 +238,7 @@
     PACIFIC: PACIFIC,
     CHICAGO: CHICAGO,
     START_CONFIRM_LEAD_MS: START_CONFIRM_LEAD_MS,
+    zonedLocalToIso: zonedLocalToIso,
     zonedClock: zonedClock,
     displayStatus: displayStatus,
     lifeCycleLabel: lifeCycleLabel,
