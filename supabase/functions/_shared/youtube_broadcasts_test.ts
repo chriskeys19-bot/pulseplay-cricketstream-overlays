@@ -12,6 +12,9 @@ import {
   planEnd,
   planStart,
   publicConnection,
+  broadcastByIdUrl,
+  broadcastListUrl,
+  listChannelBroadcasts,
   readGoogleFailure,
   syncPlan,
   toClientBroadcast,
@@ -35,9 +38,9 @@ function broadcast(lifeCycle: string, bound = STREAM): ParsedBroadcast {
   }
 }
 
-function apiBroadcast(lifeCycle: string) {
+function apiBroadcast(lifeCycle: string, id = ID) {
   return {
-    id: ID,
+    id,
     snippet: { title: 'Pulse Play vs Hawks', scheduledStartTime: '2026-11-26T18:00:00Z' },
     status: { lifeCycleStatus: lifeCycle },
     contentDetails: { boundStreamId: STREAM },
@@ -212,6 +215,83 @@ test('client broadcasts expose the watch URL and never a stream secret', () => {
   })
   assert.equal(labels.get(STREAM)?.title, 'Yolobox Pro 1')
   assert.equal(JSON.stringify([...labels.values()]).includes('secret'), false)
+})
+
+test('list URLs use one YouTube filter and never mine', () => {
+  const urls = [
+    broadcastListUrl('upcoming'),
+    broadcastListUrl('completed', 'next-page'),
+    broadcastListUrl('all'),
+    broadcastByIdUrl(ID),
+  ]
+  for (const url of urls) assert.equal(url.includes('mine='), false)
+  assert.equal(new URL(urls[0]).searchParams.get('broadcastStatus'), 'upcoming')
+  assert.equal(new URL(urls[1]).searchParams.get('broadcastStatus'), 'completed')
+  assert.equal(new URL(urls[1]).searchParams.get('pageToken'), 'next-page')
+  assert.equal(new URL(urls[2]).searchParams.get('broadcastStatus'), 'all')
+  assert.equal(new URL(urls[3]).searchParams.get('id'), ID)
+  assert.equal(new URL(urls[3]).searchParams.get('broadcastStatus'), null)
+})
+
+test('list errors are readable and update errors stay distinct', () => {
+  const quota = 'YouTube quota is used up for now. Wait a few minutes, then try again.'
+  const reasons = ['incompatibleParameters', 'invalidFilters', 'unexpectedParameter', 'missingRequiredParameter']
+  for (const reason of reasons) {
+    const body = { error: { errors: [{ reason }] } }
+    assert.equal(readGoogleFailure(400, body, 'list')?.message, 'YouTube rejected the broadcast list request. Try again.')
+    assert.equal(readGoogleFailure(400, body)?.message, 'YouTube rejected that request. Refresh the list and try again.')
+  }
+  for (const reason of ['liveStreamingNotEnabled', 'insufficientLivePermissions', 'livePermissionBlocked']) {
+    assert.equal(
+      readGoogleFailure(403, { error: { errors: [{ reason }] } }, 'list')?.message,
+      'Enable live streaming on this YouTube channel, then try again.',
+    )
+  }
+  assert.equal(
+    readGoogleFailure(403, { error: { errors: [{ reason: 'accessNotConfigured' }] } }, 'list')?.message,
+    'The YouTube Data API is not enabled for this project. An admin needs to turn it on, then try again.',
+  )
+  assert.equal(readGoogleFailure(403, { error: { errors: [{ reason: 'dailyLimitExceeded' }] } }, 'list')?.message, quota)
+  assert.equal(readGoogleFailure(403, { error: { errors: [{ reason: 'userRateLimitExceeded' }] } })?.message, quota)
+  assert.equal(
+    readGoogleFailure(500, { error: { errors: [{ reason: 'backendError' }] } }, 'list')?.message,
+    'YouTube could not load the broadcast list. Try again.',
+  )
+  assert.equal(
+    readGoogleFailure(500, { error: { errors: [{ reason: 'backendError' }] } })?.message,
+    'YouTube could not update this broadcast. Refresh the list and try again.',
+  )
+})
+
+test('listChannelBroadcasts loads upcoming, active, and completed without mine', async () => {
+  const urls: string[] = []
+  const result = await listChannelBroadcasts(
+    caller((url) => {
+      urls.push(url)
+      const status = new URL(url).searchParams.get('broadcastStatus')
+      const life = status === 'active' ? 'live' : status === 'completed' ? 'complete' : 'ready'
+      return { status: 200, json: { items: [apiBroadcast(life, `broadcast-${status}`)] } }
+    }),
+    'ya29.access-token-value',
+  )
+  assert.equal(result.ok, true)
+  if (result.ok) {
+    assert.deepEqual(result.rows.map((row) => row.id), ['broadcast-upcoming', 'broadcast-active', 'broadcast-completed'])
+  }
+  assert.deepEqual(urls.map((url) => new URL(url).searchParams.get('broadcastStatus')), ['upcoming', 'active', 'completed'])
+  assert.ok(urls.every((url) => !url.includes('mine=')))
+})
+
+test('a rejected list page returns the list error and does not ask to reconnect', async () => {
+  const result = await listChannelBroadcasts(
+    caller(() => ({ status: 400, json: { error: { errors: [{ reason: 'incompatibleParameters' }] } } })),
+    'ya29.access-token-value',
+  )
+  assert.deepEqual(result, {
+    ok: false,
+    message: 'YouTube rejected the broadcast list request. Try again.',
+    reconnect: false,
+  })
 })
 
 test('connection status for the browser omits the refresh token', () => {
