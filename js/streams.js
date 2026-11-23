@@ -199,7 +199,8 @@
     }
     node.className = "broadcast-notice is-err";
     node.innerHTML = "";
-    node.appendChild(document.createTextNode(youtubeNote + " "));
+    node.appendChild(document.createTextNode(youtubeNote + (isOperator() ? "" : " ")));
+    if (isOperator()) return;
     var link = document.createElement("button");
     link.type = "button";
     setText(link, "Connect YouTube");
@@ -276,7 +277,7 @@
       busy = inflight === row.id;
       actions.appendChild(actionButton(busy ? "Working…" : "Start", "", busy || !!inflight, startRow(row)));
       actions.appendChild(actionButton(busy ? "Working…" : "End", "btn-danger", busy || !!inflight, endRow(row)));
-      if (row.event === "PSD") {
+      if (row.event === "PSD" && !isOperator()) {
         groundId = groundIdFor(row.ground);
         ads = document.createElement("button");
         ads.type = "button";
@@ -304,12 +305,16 @@
     return node;
   }
 
+  function isOperator() {
+    return window.PulsePlayAccess && window.PulsePlayAccess.role === "operator";
+  }
+
   function startRow(row) {
     return function () {
       var iso;
       var copy;
       if (inflight) return;
-      if (!connected) {
+      if (!connected && !isOperator()) {
         youtubeNote = "YouTube isn't connected.";
         paintNote();
         return;
@@ -330,7 +335,7 @@
   function endRow(row) {
     return function () {
       if (inflight) return;
-      if (!connected) {
+      if (!connected && !isOperator()) {
         youtubeNote = "YouTube isn't connected.";
         paintNote();
         return;
@@ -343,7 +348,7 @@
   function go(action, row) {
     inflight = row.id;
     paint();
-    invoke({ action: action, broadcastId: row.video_id }).then(function (result) {
+    invoke({ action: action, broadcastId: row.video_id, streamId: row.id }).then(function (result) {
       inflight = "";
       if (result.error) {
         youtubeNote = result.error;
@@ -394,6 +399,12 @@
       }
       streams = result.data || [];
       fillFilters();
+      if (isOperator()) {
+        connected = true;
+        paintNote();
+        paint();
+        return;
+      }
       loadYouTube().then(function () {
         paintNote();
         paint();

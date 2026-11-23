@@ -37,6 +37,7 @@
       <button type="button" id="tab-streams" class="tab is-active">Streams</button>
       <button type="button" id="tab-setup-home" class="tab">Setup</button>
       <button type="button" id="tab-broadcasts" class="tab">Broadcasts</button>
+      <button type="button" id="tab-access" class="tab">Access</button>
       <button type="button" id="btn-sign-out" class="btn-text is-off">Sign out</button>
     </nav>
 
@@ -45,7 +46,7 @@
     <section id="panel-streams" aria-label="Streams">
       <div class="center-head">
         <h2>Streams</h2>
-        <p>Today and upcoming CricketCrazeUSA games. Start and End use the same YouTube connection as Broadcasts.</p>
+        <p id="streams-intro">Today and upcoming CricketCrazeUSA games. Start and End use the same YouTube connection as Broadcasts.</p>
       </div>
       <p id="streams-youtube" class="broadcast-notice is-off" role="status"></p>
       <div class="stream-filters">
@@ -54,6 +55,17 @@
         <label class="check"><input type="checkbox" id="streams-hide-ended" checked> Hide ended</label>
       </div>
       <div id="streams-list"></div>
+    </section>
+
+    <section id="panel-access" class="is-off" aria-label="Access">
+      <div class="center-head">
+        <h2>Access</h2>
+        <p>Invite one operator per division. You can add another person to a division, or give one person more than one division. They only see their games.</p>
+      </div>
+      <p id="access-note" class="broadcast-notice is-off" role="status"></p>
+      <div id="access-divisions"></div>
+      <h3>Operators</h3>
+      <div id="access-list"></div>
     </section>
 
     <nav id="setup-subnav" class="tabs subtabs is-off" aria-label="Setup">
@@ -325,6 +337,7 @@
   <script src="js/youtube-broadcasts.js"></script>
   <script src="js/broadcasts.js"></script>
   <script src="js/streams.js"></script>
+  <script src="js/access.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

@@ -1,5 +1,7 @@
 import { json, preflight, redactForLog } from '../_shared/http.ts'
-import { oauthSecrets, requireStaff, serviceClient } from '../_shared/club_user.ts'
+import { oauthSecrets, serviceClient } from '../_shared/club_user.ts'
+import { requireBroadcastCaller } from '../_shared/pp_caller.ts'
+import { authorizeBroadcast, type StreamRow } from '../_shared/pp_access.ts'
 import { readOauthToken } from '../_shared/youtube_oauth.ts'
 import {
   RECENT_ENDED_MS,
@@ -14,7 +16,6 @@ import {
   watchUrl,
   parseStreamLabels,
   streamStatusUrl,
-  VIDEO_ID,
   type ParsedBroadcast,
   type PublicConnection,
   type YoutubeCaller,
@@ -104,48 +105,71 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return preflight(req)
   if (req.method !== 'POST') return json(req, 405, { error: 'Use POST.' })
 
-  const staff = await requireStaff(req)
+  const staff = await requireBroadcastCaller(req)
   if ('error' in staff) return json(req, staff.status, { error: staff.error })
+  const caller = staff.caller
+  const respond = (status: number, body: Record<string, unknown>) => {
+    if (!caller.admin) {
+      const copy = { ...body }
+      delete copy.connection
+      return json(req, status, copy)
+    }
+    return json(req, status, body)
+  }
 
   const text = await req.text()
-  if (text.length > 4000) return json(req, 413, { error: 'That request is too large.' })
-  let body: unknown = {}
+  if (text.length > 4000) return respond(413, { error: 'That request is too large.' })
+  let body: { action?: unknown; broadcastId?: unknown; streamId?: unknown } = {}
   if (text.trim()) {
     try {
-      body = JSON.parse(text) as unknown
+      body = JSON.parse(text) as { action?: unknown; broadcastId?: unknown; streamId?: unknown }
     } catch {
-      return json(req, 400, { error: 'Send JSON.' })
+      return respond(400, { error: 'Send JSON.' })
     }
   }
-  const action = body && typeof body === 'object' ? (body as { action?: unknown }).action : null
-  const broadcastId = body && typeof body === 'object' ? (body as { broadcastId?: unknown }).broadcastId : null
-  if (action !== 'status' && action !== 'list' && action !== 'test' && action !== 'start' && action !== 'end') {
-    return json(req, 400, { error: 'Choose a broadcast action.' })
-  }
-  if ((action === 'start' || action === 'end') && (typeof broadcastId !== 'string' || !VIDEO_ID.test(broadcastId))) {
-    return json(req, 400, { error: 'Choose a broadcast.' })
-  }
+  const action = typeof body.action === 'string' ? body.action : ''
+  const requestedId = typeof body.streamId === 'string' && body.streamId.trim()
+    ? body.streamId.trim()
+    : typeof body.broadcastId === 'string'
+      ? body.broadcastId.trim()
+      : ''
 
   const admin = serviceClient()
-  if (!admin) return json(req, 500, { error: 'Streams are not available right now.' })
+  if (!admin) return respond(500, { error: 'Streams are not available right now.' })
+  let streamRows: StreamRow[] = []
+  if ((action === 'start' || action === 'end') && /^[A-Za-z0-9_-]{6,80}$/.test(requestedId)) {
+    const found = await admin
+      .from('pp_streams')
+      .select('id, video_id, division')
+      .or(`id.eq.${requestedId},video_id.eq.${requestedId}`)
+    if (found.error) return respond(500, { error: 'Streams are not available right now.' })
+    streamRows = []
+    for (const item of found.data ?? []) {
+      if (!item || typeof item.id !== 'string' || typeof item.video_id !== 'string' || typeof item.division !== 'string') continue
+      streamRows.push({ id: item.id, videoId: item.video_id, division: item.division })
+    }
+  }
+  const decision = authorizeBroadcast({ caller, action, requestedId, rows: streamRows })
+  if (!decision.ok) return respond(decision.status, { error: decision.error })
+
   const storedResult = await admin.rpc('youtube_connection_read')
-  if (storedResult.error) return json(req, 500, { error: 'Streams are not available right now.' })
+  if (storedResult.error) return respond(500, { error: 'Streams are not available right now.' })
   const stored = parseStored(storedResult.data)
   const connection = shownConnection(stored)
 
-  if (action === 'status') return json(req, 200, { connection })
-  if (!stored) return json(req, 409, { error: NOT_CONNECTED, connection })
+  if (action === 'status') return respond(200, { connection })
+  if (!stored) return respond(409, { error: NOT_CONNECTED, connection })
 
   const secrets = oauthSecrets()
-  if (!secrets) return json(req, 500, { error: 'YouTube OAuth is not configured yet.', connection })
+  if (!secrets) return respond(500, { error: 'YouTube OAuth is not configured yet.', connection })
 
   const refreshed = await refreshAccessToken(stored.refreshToken, secrets.clientId, secrets.clientSecret)
   if (!refreshed.ok) {
     if (refreshed.reason === 'invalid_grant') {
       await admin.rpc('youtube_connection_mark_error', { p_message: 'Refresh token expired or revoked.' })
-      return json(req, 409, { error: RECONNECT_MESSAGE, connection: shownConnection(stored, 'expired') })
+      return respond(409, { error: RECONNECT_MESSAGE, connection: shownConnection(stored, 'expired') })
     }
-    return json(req, 502, { error: 'YouTube did not respond. Try again.', connection })
+    return respond(502, { error: 'YouTube did not respond. Try again.', connection })
   }
   await admin.rpc('youtube_connection_note_refresh', { p_refresh_token: refreshed.refreshToken })
   const liveConnection = shownConnection({ ...stored, tokenError: null })
@@ -156,11 +180,11 @@ Deno.serve(async (req: Request) => {
     if (!tested.ok) {
       if (tested.reconnect) {
         await admin.rpc('youtube_connection_mark_error', { p_message: 'YouTube rejected the access token.' })
-        return json(req, 409, { error: tested.message, connection: shownConnection(stored, 'expired') })
+        return respond(409, { error: tested.message, connection: shownConnection(stored, 'expired') })
       }
-      return json(req, 502, { error: tested.message, connection: liveConnection })
+      return respond(502, { error: tested.message, connection: liveConnection })
     }
-    return json(req, 200, {
+    return respond(200, {
       ok: true,
       count: tested.count,
       message: `YouTube responded. The test read ${tested.count} broadcast${tested.count === 1 ? '' : 's'} and did not change any.`,
@@ -173,9 +197,9 @@ Deno.serve(async (req: Request) => {
     if (!listed.ok) {
       if (listed.reconnect) {
         await admin.rpc('youtube_connection_mark_error', { p_message: 'YouTube rejected the access token.' })
-        return json(req, 409, { error: listed.message, connection: shownConnection(stored, 'expired') })
+        return respond(409, { error: listed.message, connection: shownConnection(stored, 'expired') })
       }
-      return json(req, 502, { error: listed.message, connection: liveConnection })
+      return respond(502, { error: listed.message, connection: liveConnection })
     }
     const now = Date.now()
     const fresh = listed.rows.filter((row) => {
@@ -184,25 +208,26 @@ Deno.serve(async (req: Request) => {
       return Number.isFinite(stamp) && now - stamp <= RECENT_ENDED_MS
     })
     const broadcasts = await withStreamKeys(admin, call, refreshed.accessToken, fresh)
-    return json(req, 200, { connection: liveConnection, broadcasts })
+    return respond(200, { connection: liveConnection, broadcasts })
   }
 
-  const id = broadcastId as string
+  const id = decision.videoId
   const result = action === 'start'
     ? await executeStart(id, call, refreshed.accessToken)
     : await executeEnd(id, call, refreshed.accessToken)
   if (!result.ok) {
     if (result.reconnect) {
       await admin.rpc('youtube_connection_mark_error', { p_message: 'YouTube rejected the access token.' })
-      return json(req, 409, { error: result.message, connection: shownConnection(stored, 'expired') })
+      return respond(409, { error: result.message, connection: shownConnection(stored, 'expired') })
     }
-    return json(req, 409, { error: result.message, connection: liveConnection })
+    return respond(409, { error: result.message, connection: liveConnection })
   }
 
   const matched = result.lifeCycle === 'live' || result.lifeCycle === 'complete'
-    ? await syncMatched(admin, id, result.phase, staff.caller.id)
+    ? await syncMatched(admin, id, result.phase, staff.userId)
     : 0
-  return json(req, 200, {
+  await noteStreamStatus(admin, id, result.lifeCycle)
+  return respond(200, {
     ok: true,
     message: result.message,
     lifeCycle: result.lifeCycle,
@@ -210,6 +235,20 @@ Deno.serve(async (req: Request) => {
     connection: liveConnection,
   })
 })
+
+async function noteStreamStatus(
+  admin: NonNullable<ReturnType<typeof serviceClient>>,
+  videoId: string,
+  lifeCycle: string,
+) {
+  const status = lifeCycle === 'complete' || lifeCycle === 'revoked'
+    ? 'ended'
+    : lifeCycle === 'live' || lifeCycle === 'liveStarting'
+      ? 'live'
+      : ''
+  if (!status) return
+  await admin.from('pp_streams').update({ status, updated_at: new Date().toISOString() }).eq('video_id', videoId)
+}
 
 async function withStreamKeys(
   admin: NonNullable<ReturnType<typeof serviceClient>>,
