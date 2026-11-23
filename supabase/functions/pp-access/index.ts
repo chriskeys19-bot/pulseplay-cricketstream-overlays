@@ -10,13 +10,12 @@ import {
   mergeDivisions,
   normalizeEmail,
   operatorSignInUrl,
-  smtpReady,
+  smtpFailure,
 } from '../_shared/pp_access.ts'
 
-// Admin-only invites. Sends through the Gmail SMTP secrets already on this
-// project (INVITE_SMTP_USER, INVITE_SMTP_PASS). Never returns the sign-in link.
+// Admin-only invites. Sends from cricketcrazeusa@gmail.com through
+// PP_INVITE_SMTP_USER and PP_INVITE_SMTP_PASS. Never returns the sign-in link.
 
-const NOT_CONFIGURED = 'Invite email is not set up yet. Check the SMTP secrets, then resend.'
 const SEND_FAILED = 'The operator is saved, but the email did not send. Press Resend.'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -32,10 +31,11 @@ function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;')
 }
 
-function smtpSettings(): { user: string; pass: string } | null {
-  const user = (Deno.env.get('INVITE_SMTP_USER') ?? '').trim().toLowerCase()
-  const pass = (Deno.env.get('INVITE_SMTP_PASS') ?? '').replace(/\s+/g, '')
-  if (!smtpReady(user, pass)) return null
+function smtpSettings(): { user: string; pass: string } | { error: string } {
+  const user = (Deno.env.get('PP_INVITE_SMTP_USER') ?? '').trim().toLowerCase()
+  const pass = (Deno.env.get('PP_INVITE_SMTP_PASS') ?? '').replace(/\s+/g, '')
+  const error = smtpFailure(user, pass)
+  if (error) return { error }
   return { user, pass }
 }
 
@@ -198,7 +198,7 @@ async function deliver(
   if (saved.error) return { status: 500, body: { error: 'Could not save that operator.' } }
 
   const settings = smtpSettings()
-  if (!settings) return { status: 503, body: { error: NOT_CONFIGURED } }
+  if ('error' in settings) return { status: 503, body: { error: settings.error } }
   try {
     await sendInvite(email, divisions, link, settings.pass)
   } catch (error) {

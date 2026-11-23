@@ -10,6 +10,7 @@ import {
   mergeDivisions,
   normalizeEmail,
   operatorSignInUrl,
+  smtpFailure,
   smtpReady,
 } from '../supabase/functions/_shared/pp_access.ts'
 
@@ -118,7 +119,14 @@ test('the invite letter names the division and the GitHub Pages admin page', () 
   assert.match(letter.text, /github\.io/)
   assert.equal(inviteLetter(['U13'], 'https://example.com/phish'), null)
   assert.equal(divisionPhrase(['U9', 'U15']), 'U9 and U15')
-  assert.equal(smtpReady('cheetahscc123@gmail.com', 'app-pass-value'), true)
-  assert.equal(smtpReady('other@example.com', 'app-pass-value'), false)
-  assert.equal(smtpReady('cheetahscc123@gmail.com', 'short'), false)
+  assert.equal(smtpFailure('', ''), 'Set PP_INVITE_SMTP_USER and PP_INVITE_SMTP_PASS, then resend.')
+  assert.equal(smtpFailure('cheetahscc123@gmail.com', 'app-pass-value'), 'PP_INVITE_SMTP_USER must be cricketcrazeusa@gmail.com.')
+  assert.equal(smtpFailure('cricketcrazeusa@gmail.com', 'short'), 'PP_INVITE_SMTP_PASS is missing or too short.')
+  assert.equal(smtpFailure('cricketcrazeusa@gmail.com', 'app-pass-value'), null)
+  assert.equal(smtpReady('cricketcrazeusa@gmail.com', 'app-pass-value'), true)
+  const source = readFileSync(new URL('../supabase/functions/pp-access/index.ts', import.meta.url), 'utf8')
+  assert.match(source, /PP_INVITE_SMTP_USER/)
+  assert.match(source, /PP_INVITE_SMTP_PASS/)
+  assert.equal(source.includes("get('INVITE_SMTP_"), false)
+  assert.equal(source.includes('cheetahscc123'), false)
 })
