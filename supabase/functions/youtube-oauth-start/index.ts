@@ -1,4 +1,4 @@
-import { json } from '../_shared/http.ts'
+import { json, preflight } from '../_shared/http.ts'
 import { oauthSecrets, requireStaff, serviceClient } from '../_shared/club_user.ts'
 import { googleAuthorizeUrl, signOauthState, youtubeRedirectUri } from '../_shared/youtube_oauth.ts'
 
@@ -7,7 +7,7 @@ import { googleAuthorizeUrl, signOauthState, youtubeRedirectUri } from '../_shar
 // and returned only inside the Google authorize URL.
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: json(req, 204, {}).headers })
+  if (req.method === 'OPTIONS') return preflight(req)
   if (req.method !== 'POST') return json(req, 405, { error: 'Use POST.' })
 
   const staff = await requireStaff(req)

@@ -1,4 +1,4 @@
-import { redactForLog } from '../_shared/http.ts'
+import { preflight, redactForLog } from '../_shared/http.ts'
 import { oauthSecrets, serviceClient } from '../_shared/club_user.ts'
 import {
   broadcastsReturnUrl,
@@ -23,6 +23,7 @@ function redirectTo(result: { ok: true } | { ok: false; reason: string }): Respo
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return preflight(req)
   if (req.method !== 'GET') return redirectTo({ ok: false, reason: 'exchange' })
 
   const url = new URL(req.url)

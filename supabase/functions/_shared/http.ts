@@ -2,6 +2,7 @@ export const DEFAULT_ORIGIN = 'https://chriskeys19-bot.github.io'
 
 export const ALLOWED_ORIGINS = new Set([
   'https://chriskeys19-bot.github.io',
+  'https://cheetahs-club.pages.dev',
   'http://127.0.0.1:8765',
   'http://localhost:8765',
 ])
@@ -43,4 +44,9 @@ export function json(req: Request, status: number, body: unknown): Response {
       'Cache-Control': 'no-store',
     },
   })
+}
+
+/** CORS preflight. 204 must have a null body, so do not build it with json(). */
+export function preflight(req: Request): Response {
+  return new Response(null, { status: 204, headers: { ...corsHeaders(req), 'Access-Control-Max-Age': '86400' } })
 }

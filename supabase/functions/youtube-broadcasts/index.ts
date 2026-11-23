@@ -1,4 +1,4 @@
-import { json, redactForLog } from '../_shared/http.ts'
+import { json, preflight, redactForLog } from '../_shared/http.ts'
 import { oauthSecrets, requireStaff, serviceClient } from '../_shared/club_user.ts'
 import { readOauthToken } from '../_shared/youtube_oauth.ts'
 import {
@@ -101,7 +101,7 @@ function youtubeCaller(token: string): YoutubeCaller {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: json(req, 204, {}).headers })
+  if (req.method === 'OPTIONS') return preflight(req)
   if (req.method !== 'POST') return json(req, 405, { error: 'Use POST.' })
 
   const staff = await requireStaff(req)

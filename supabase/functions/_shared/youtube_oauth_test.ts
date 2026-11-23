@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { json, redactForLog } from './http.ts'
+import { json, preflight, redactForLog } from './http.ts'
 import {
   broadcastsReturnUrl,
   googleAuthorizeUrl,
@@ -90,6 +90,19 @@ test('the browser returns to the broadcasts page without tokens', () => {
   assert.equal(broadcastsReturnUrl({ ok: false, reason: 'refresh_token=secret' }).includes('refresh_token'), false)
   assert.match(oauthReturnMessage('state'), /expired or was already used/)
   assert.match(oauthReturnMessage('missing_refresh'), /refresh token/)
+})
+
+test('preflight is a 204 with a null body and the github.io origin', async () => {
+  const request = new Request('https://example.test/youtube-broadcasts', {
+    method: 'OPTIONS',
+    headers: { Origin: 'https://chriskeys19-bot.github.io' },
+  })
+  const response = preflight(request)
+  assert.equal(response.status, 204)
+  assert.equal(response.body, null)
+  assert.equal(await response.text(), '')
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://chriskeys19-bot.github.io')
+  assert.equal(response.headers.get('Access-Control-Max-Age'), '86400')
 })
 
 test('json responses refuse token fields and logs are redacted', async () => {
