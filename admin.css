@@ -344,6 +344,32 @@ input, select, textarea, button { font-size: 16px; }
   border-radius: 8px;
 }
 .stream-row p { margin: 4px 0; }
+.stream-title, .stream-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.stream-title span, .stream-link span { flex: 1 1 12em; min-width: 0; }
+.stream-title a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+}
+.btn-copy {
+  flex: 0 0 auto;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 12px;
+  border: 1px solid #e4b75a;
+  border-radius: 8px;
+  background: transparent;
+  color: #f6f3ea;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
 .stream-actions button, .access-division button, .access-actions button { min-height: 44px; }
 .access-division { margin: 0 0 14px; }
 .access-division input { display: block; width: 100%; max-width: 420px; min-height: 44px; margin-top: 4px; }
