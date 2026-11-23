@@ -159,7 +159,9 @@ export function planEnd(lifeCycle: string): EndPlan {
 
 export type GoogleFailure = { status: number; reason: string; message: string }
 
-export function humanYouTubeFailure(reason: string, status: number): string {
+export type YoutubeCallKind = 'list' | 'update'
+
+export function humanYouTubeFailure(reason: string, status: number, kind: YoutubeCallKind = 'update'): string {
   const key = reason.toLowerCase()
   if (key === 'errorstreaminactive' || key === 'streaminactive') return ENCODER_NOT_READY
   if (key === 'invalidtransition') {
@@ -172,13 +174,35 @@ export function humanYouTubeFailure(reason: string, status: number): string {
     return RECONNECT_MESSAGE
   }
   if (key === 'insufficientpermissions' || key === 'forbidden') return RECONNECT_MESSAGE
-  if (key === 'quotaexceeded' || key === 'ratelimitexceeded') {
+  if (
+    key === 'incompatibleparameters' ||
+    key === 'invalidfilters' ||
+    key === 'unexpectedparameter' ||
+    key === 'missingrequiredparameter'
+  ) {
+    return kind === 'list'
+      ? 'YouTube rejected the broadcast list request. Try again.'
+      : 'YouTube rejected that request. Refresh the list and try again.'
+  }
+  if (key === 'livestreamingnotenabled' || key === 'insufficientlivepermissions' || key === 'livepermissionblocked') {
+    return 'Enable live streaming on this YouTube channel, then try again.'
+  }
+  if (key === 'accessnotconfigured') {
+    return 'The YouTube Data API is not enabled for this project. An admin needs to turn it on, then try again.'
+  }
+  if (
+    key === 'quotaexceeded' ||
+    key === 'ratelimitexceeded' ||
+    key === 'dailylimitexceeded' ||
+    key === 'userratelimitexceeded'
+  ) {
     return 'YouTube quota is used up for now. Wait a few minutes, then try again.'
   }
+  if (kind === 'list') return 'YouTube could not load the broadcast list. Try again.'
   return 'YouTube could not update this broadcast. Refresh the list and try again.'
 }
 
-export function readGoogleFailure(status: number, body: unknown): GoogleFailure | null {
+export function readGoogleFailure(status: number, body: unknown, kind: YoutubeCallKind = 'update'): GoogleFailure | null {
   if (status < 400) return null
   let reason = 'unknown'
   if (body && typeof body === 'object') {
@@ -192,7 +216,7 @@ export function readGoogleFailure(status: number, body: unknown): GoogleFailure 
       }
     }
   }
-  return { status, reason, message: humanYouTubeFailure(reason, status) }
+  return { status, reason, message: humanYouTubeFailure(reason, status, kind) }
 }
 
 export function needsReconnect(failure: GoogleFailure): boolean {
@@ -307,9 +331,10 @@ export type YoutubeResponse = { status: number; json: unknown }
 export type YoutubeCaller = (input: { url: string; method: 'GET' | 'POST'; token: string }) => Promise<YoutubeResponse>
 
 export function broadcastListUrl(status: 'upcoming' | 'active' | 'completed' | 'all', pageToken?: string): string {
+  // liveBroadcasts.list accepts exactly one of broadcastStatus, id, or mine.
+  // mine together with broadcastStatus returns 400 incompatibleParameters.
   const url = new URL(`${YOUTUBE_API}/liveBroadcasts`)
   url.searchParams.set('part', 'snippet,status,contentDetails')
-  url.searchParams.set('mine', 'true')
   url.searchParams.set('broadcastStatus', status)
   url.searchParams.set('maxResults', status === 'all' ? '5' : '50')
   if (pageToken) url.searchParams.set('pageToken', pageToken)
@@ -567,8 +592,11 @@ export async function listChannelBroadcasts(
     const pageLimit = status === 'completed' ? 1 : 4
     for (let page = 0; page < pageLimit; page += 1) {
       const response = await call({ url: broadcastListUrl(status, pageToken), method: 'GET', token })
-      const failure = readGoogleFailure(response.status, response.json)
-      if (failure) return { ok: false, message: failure.message, reconnect: needsReconnect(failure) }
+      const failure = readGoogleFailure(response.status, response.json, 'list')
+      if (failure) {
+        console.error('youtube list failed', failure.status, failure.reason.slice(0, 80))
+        return { ok: false, message: failure.message, reconnect: needsReconnect(failure) }
+      }
       const parsed = parseBroadcastPage(response.json)
       for (const item of parsed.items) {
         if (seen.has(item.id)) continue
@@ -587,7 +615,10 @@ export async function testChannelConnection(
   token: string,
 ): Promise<{ ok: true; count: number } | { ok: false; message: string; reconnect: boolean }> {
   const response = await call({ url: broadcastListUrl('all'), method: 'GET', token })
-  const failure = readGoogleFailure(response.status, response.json)
-  if (failure) return { ok: false, message: failure.message, reconnect: needsReconnect(failure) }
+  const failure = readGoogleFailure(response.status, response.json, 'list')
+  if (failure) {
+    console.error('youtube list failed', failure.status, failure.reason.slice(0, 80))
+    return { ok: false, message: failure.message, reconnect: needsReconnect(failure) }
+  }
   return { ok: true, count: parseBroadcastPage(response.json).items.length }
 }
