@@ -2,7 +2,7 @@
 
 export const DIVISIONS = ['U9', 'U11', 'U13', 'U15'] as const
 export const ADMIN_PAGE = 'https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/admin.html'
-export const SMTP_MAILBOX = 'cheetahscc123@gmail.com'
+export const SMTP_MAILBOX = 'cricketcrazeusa@gmail.com'
 
 const REQUEST_ID = /^[A-Za-z0-9_-]{6,80}$/
 const VIDEO_ID = /^[A-Za-z0-9_-]{6,64}$/
@@ -77,8 +77,17 @@ export function inviteLetter(divisions: string[], link: string): { subject: stri
   return { subject, text }
 }
 
+export function smtpFailure(user: string, pass: string): string | null {
+  const account = user.trim().toLowerCase()
+  const secret = pass.replace(/\s+/g, '')
+  if (!account || !secret) return 'Set PP_INVITE_SMTP_USER and PP_INVITE_SMTP_PASS, then resend.'
+  if (account !== SMTP_MAILBOX) return 'PP_INVITE_SMTP_USER must be cricketcrazeusa@gmail.com.'
+  if (secret.length < 8) return 'PP_INVITE_SMTP_PASS is missing or too short.'
+  return null
+}
+
 export function smtpReady(user: string, pass: string): boolean {
-  return user.trim().toLowerCase() === SMTP_MAILBOX && pass.replace(/\s+/g, '').length >= 8
+  return smtpFailure(user, pass) === null
 }
 
 export function authorizeBroadcast(input: {
