@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.81.1'
 import { serviceClient } from './club_user.ts'
-import { cleanDivisions, type Caller } from './pp_access.ts'
+import { resolvePulsePlayCaller } from './pp_admin.ts'
+import { type Caller } from './pp_access.ts'
 
 export async function requireBroadcastCaller(
   req: Request,
@@ -32,34 +33,12 @@ export async function requireBroadcastCaller(
   } else if (profileResult.error) {
     return { status: 500, error: 'Streams are not available right now.' }
   }
-  if (role === 'admin' && access !== 'pending') return { caller: { admin: true }, userId: user.id }
-  if (role === 'admin' && access === 'pending') return { status: 403, error: 'Your club access is still pending.' }
-
   const admin = serviceClient()
   if (!admin) return { status: 500, error: 'Streams are not available right now.' }
-  const email = (user.email ?? '').trim().toLowerCase()
-  const byId = await admin
-    .from('pp_operators')
-    .select('id, user_id, divisions, active')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (byId.error) return { status: 500, error: 'Streams are not available right now.' }
-  let row = byId.data
-  if (!row && email) {
-    const byEmail = await admin
-      .from('pp_operators')
-      .select('id, user_id, divisions, active')
-      .eq('email', email)
-      .maybeSingle()
-    if (byEmail.error) return { status: 500, error: 'Streams are not available right now.' }
-    row = byEmail.data
-    if (row && !row.user_id) {
-      await admin.from('pp_operators').update({ user_id: user.id }).eq('id', row.id)
-    }
-  }
-  const divisions = cleanDivisions(row?.divisions)
-  if (!row || !row.active || !divisions) {
-    return { status: 403, error: 'Only a Pulse Play admin or division operator can do that.' }
-  }
-  return { caller: { admin: false, active: true, divisions }, userId: user.id }
+  const decision = await resolvePulsePlayCaller(admin, user, { role, access })
+  if (decision.kind === 'error') return { status: 500, error: 'Streams are not available right now.' }
+  if (decision.kind === 'admin') return { caller: { admin: true }, userId: user.id }
+  if (decision.kind === 'pending') return { status: 403, error: 'Your club access is still pending.' }
+  if (decision.kind === 'operator') return { caller: { admin: false, active: true, divisions: decision.divisions }, userId: user.id }
+  return { status: 403, error: 'Only a Pulse Play admin or division operator can do that.' }
 }

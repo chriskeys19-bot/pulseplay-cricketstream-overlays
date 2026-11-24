@@ -142,3 +142,38 @@ function videoOf(
   }
   return { ok: true, videoId: first.videoId }
 }
+
+export type PpAdminRecord = {
+  userId: string | null
+  email: string
+  active: boolean
+}
+
+export type PulsePlayDecision =
+  | { kind: 'admin' }
+  | { kind: 'operator'; divisions: string[] }
+  | { kind: 'pending' }
+  | { kind: 'none' }
+
+export function classifyPulsePlayCaller(input: {
+  profileRole: string | null | undefined
+  accessStatus: string | null | undefined
+  userId: string
+  email: string | null | undefined
+  emailConfirmedAt: string | null | undefined
+  admins: PpAdminRecord[]
+  operator: { active: boolean; divisions: string[] } | null
+}): PulsePlayDecision {
+  const email = (input.email ?? '').trim().toLowerCase()
+  const verified = Boolean(input.emailConfirmedAt) && Boolean(email)
+  const ppAdmin = input.admins.some((row) => {
+    if (!row.active) return false
+    if (row.userId && row.userId === input.userId) return true
+    return verified && row.email.trim().toLowerCase() === email
+  })
+  if ((input.profileRole === 'admin' && input.accessStatus !== 'pending') || ppAdmin) return { kind: 'admin' }
+  if (input.profileRole === 'admin' && input.accessStatus === 'pending') return { kind: 'pending' }
+  const divisions = input.operator && input.operator.active ? cleanDivisions(input.operator.divisions) : null
+  if (divisions) return { kind: 'operator', divisions }
+  return { kind: 'none' }
+}

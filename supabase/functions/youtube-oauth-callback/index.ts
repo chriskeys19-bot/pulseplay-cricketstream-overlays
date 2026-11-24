@@ -1,5 +1,6 @@
 import { preflight, redactForLog } from '../_shared/http.ts'
 import { oauthSecrets, serviceClient } from '../_shared/club_user.ts'
+import { resolvePulsePlayCaller } from '../_shared/pp_admin.ts'
 import {
   broadcastsReturnUrl,
   readChannel,
@@ -61,7 +62,11 @@ Deno.serve(async (req: Request) => {
   } else if (profile.error) {
     return redirectTo({ ok: false, reason: 'forbidden' })
   }
-  if (role !== 'admin' || access === 'pending') {
+  const account = await admin.auth.admin.getUserById(consumedId)
+  const decision = account.data.user
+    ? await resolvePulsePlayCaller(admin, account.data.user, { role, access })
+    : { kind: 'none' as const }
+  if (decision.kind !== 'admin') {
     return redirectTo({ ok: false, reason: 'forbidden' })
   }
 

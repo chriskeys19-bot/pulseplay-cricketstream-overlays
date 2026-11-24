@@ -21,8 +21,9 @@ import {
   type YoutubeCaller,
 } from '../_shared/youtube_broadcasts.ts'
 
-// Lists, tests, starts, and ends broadcasts for a signed-in Pulse Play admin.
-// verify_jwt stays on. The handler calls getUser and checks profiles.role.
+// Lists, tests, starts, and ends broadcasts for a Pulse Play admin.
+// verify_jwt stays on. Admins are club admins or an active pp_admins row.
+// Division operators can start and end only their own streams.
 // The refresh token stays in private.youtube_connections.
 
 type StoredConnection = {

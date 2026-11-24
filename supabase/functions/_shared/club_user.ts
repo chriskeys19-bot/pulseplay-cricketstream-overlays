@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.81.1'
+import { resolvePulsePlayCaller } from './pp_admin.ts'
 
 export type ClubCaller = {
   id: string
@@ -56,9 +57,11 @@ export async function requireStaff(
     return { status: 500, error: 'Streams are not available right now.' }
   }
 
-  if (access === 'pending') return { status: 403, error: 'Your club access is still pending.' }
-  if (role !== 'admin') {
-    return { status: 403, error: 'Only a Pulse Play admin can manage YouTube broadcasts.' }
-  }
-  return { caller: { id: user.id, role: 'admin', admin: true } }
+  const admin = serviceClient()
+  if (!admin) return { status: 500, error: 'Streams are not available right now.' }
+  const decision = await resolvePulsePlayCaller(admin, user, { role, access })
+  if (decision.kind === 'error') return { status: 500, error: 'Streams are not available right now.' }
+  if (decision.kind === 'admin') return { caller: { id: user.id, role: 'admin', admin: true } }
+  if (decision.kind === 'pending') return { status: 403, error: 'Your club access is still pending.' }
+  return { status: 403, error: 'Only a Pulse Play admin can manage YouTube broadcasts.' }
 }
