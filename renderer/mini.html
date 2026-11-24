@@ -2,39 +2,53 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script src="../js/overlay-target.js"></script>
+  <script>
+    (function () {
+      var target;
+      var safe;
+      try {
+        target = window.PulsePlayDevice.miniHref(location.search, location.hash);
+      } catch (e) {
+        target = "pro.html" + (location.search || "");
+        if (!/([?&])device=/.test(target)) {
+          target += (target.indexOf("?") === -1 ? "?" : "&") + "device=pro";
+        } else {
+          target = target.replace(/([?&])device=[^&#]*/g, "$1device=pro");
+        }
+        if (location.hash) target += location.hash;
+      }
+      safe = String(target).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+      document.write('<meta http-equiv="refresh" content="0;url=' + safe + '">');
+      document.write('<link rel="canonical" href="' + safe + '">');
+      location.replace(target);
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YoloBox Mini overlay</title>
-  <style>html,body{background:transparent;margin:0;height:100%;overflow:hidden}</style>
-  <link rel="stylesheet" href="overlay.css">
-  <link rel="stylesheet" href="mini.css">
+  <title>YoloBox overlay</title>
+  <noscript><meta http-equiv="refresh" content="0;url=pro.html"></noscript>
+  <style>
+    html, body { background: transparent; margin: 0; }
+    body { font: 16px/1.45 Arial, Helvetica, sans-serif; color: #102018; }
+    a {
+      display: inline-block;
+      min-height: 44px;
+      min-width: 44px;
+      padding: 12px 16px;
+      font-size: 16px;
+      line-height: 20px;
+      touch-action: manipulation;
+    }
+  </style>
 </head>
-<body class="mode-logos-score" data-device="mini">
-  <div id="stage" data-w="1920" data-h="1080">
-    <div id="view-logos" class="view">
-      <img id="logo-age" class="logo logo-age" alt="Age group sponsor">
-      <img id="logo-tournament" class="logo logo-tournament" alt="Tournament">
-      <img id="logo-ccusa" class="logo logo-ccusa" alt="CricketCrazeUSA">
-      <div id="score-slot">
-        <iframe id="score-frame" title="Match score" scrolling="no" referrerpolicy="no-referrer" allowtransparency="true"></iframe>
-        <p id="score-fallback" class="is-off">
-          <span>This score source blocks embedding.</span>
-          <a id="score-fallback-link" target="_blank" rel="noopener">Open score</a>
-        </p>
-      </div>
-    </div>
-    <div id="view-ad" class="view">
-      <div id="ad-slots"></div>
-    </div>
-    <div id="subscribe-ticker" aria-hidden="true">
-      <div class="subscribe-ticker__track"><span id="subscribe-ticker-text"></span></div>
-    </div>
-    <p id="overlay-status" class="is-off"><span id="overlay-status-text"></span></p>
-  </div>
-  <script src="../config/runtime.js"></script>
-  <script src="../js/storage.js"></script>
-  <script src="../js/supabase-store.js"></script>
-  <script src="../js/score-frame.js"></script>
-  <script src="../js/layout.js"></script>
-  <script src="overlay.js"></script>
+<body>
+  <p><a id="pro-fallback" href="pro.html">Open the YoloBox Pro overlay</a></p>
+  <script>
+    (function () {
+      var link = document.getElementById("pro-fallback");
+      if (!link || !window.PulsePlayDevice) return;
+      link.href = window.PulsePlayDevice.miniHref(location.search, location.hash);
+    })();
+  </script>
 </body>
 </html>

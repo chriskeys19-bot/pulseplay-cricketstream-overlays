@@ -2,7 +2,8 @@
  * Dumb renderer for one ground. Reads config, toggles view classes, preloads
  * that ground's ads. When a video finishes, it always returns to View 1 and
  * asks the store to save that. Image ads stay until someone switches.
- * Open with ?ground=<id>&device=pro|mini
+ * Open with ?ground=<id>&device=pro
+ * A device=mini query is rewritten to device=pro before this script runs.
  */
 (function () {
   var store = window.PulsePlayStore.create({

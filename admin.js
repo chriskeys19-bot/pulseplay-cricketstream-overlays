@@ -265,8 +265,8 @@
     return "Other";
   }
 
-  function deviceLabel(device) {
-    return device === "mini" ? "YoloBox Mini" : "YoloBox Pro";
+  function deviceLabel() {
+    return window.PulsePlayDevice.deviceLabel();
   }
 
   function modeLabel(doc, ground) {
@@ -353,8 +353,8 @@
     setText(node, n + " ground" + (n === 1 ? " is" : "s are") + " marked stuck. Video ads past their length, or any ad on for more than 10 minutes, can be reset here. Image ads are not cleared automatically.");
   }
 
-  function resolvedFor(id, device) {
-    return PAGES + "/renderer/" + device + ".html?ground=" + encodeURIComponent(id) + "&device=" + device;
+  function resolvedFor(id) {
+    return window.PulsePlayDevice.pagesRendererUrl(PAGES, id);
   }
 
   function clear(node) {
@@ -376,7 +376,7 @@
     if (includeNew) select.appendChild(option("__new__", "+ New ground"));
     for (i = 0; i < currentDoc.grounds.length; i++) {
       ground = currentDoc.grounds[i];
-      select.appendChild(option(ground.id, ground.name + " (" + (ground.device === "mini" ? "Mini" : "Pro") + ")"));
+      select.appendChild(option(ground.id, window.PulsePlayDevice.groundOptionLabel(ground.name)));
     }
     if (previous && select.querySelector) {
       if (select.querySelector('option[value="' + previous + '"]')) select.value = previous;
@@ -406,16 +406,16 @@
       return;
     }
     setText(document.getElementById("st-name"), ground.name);
-    setText(document.getElementById("st-device"), deviceLabel(ground.device));
+    setText(document.getElementById("st-device"), deviceLabel());
     setText(document.getElementById("st-short"), ground.short_link);
     document.getElementById("st-short").href = ground.short_link;
-    setText(document.getElementById("st-resolved"), ground.resolved_url);
-    document.getElementById("st-resolved").href = ground.resolved_url;
+    setText(document.getElementById("st-resolved"), resolvedFor(ground.id));
+    document.getElementById("st-resolved").href = resolvedFor(ground.id);
     setText(document.getElementById("st-active"), modeLabel(currentDoc, ground));
     setText(document.getElementById("st-score"), ground.score_url);
     document.getElementById("st-score").href = window.PulsePlayStore.safeUrl(ground.score_url) || "#";
-    localLink.href = "renderer/" + ground.device + ".html?ground=" + encodeURIComponent(ground.id) + "&device=" + ground.device;
-    setText(localLink, "Open " + (ground.device === "mini" ? "Mini" : "Pro") + " overlay for this ground");
+    localLink.href = "renderer/" + window.PulsePlayDevice.rendererQuery(ground.id);
+    setText(localLink, "Open the YoloBox Pro / Ultra overlay for this ground");
     if (document.getElementById("external-video") && document.activeElement !== document.getElementById("external-video")) {
       document.getElementById("external-video").checked = ground.external_video_audio === true;
       document.getElementById("external-video").disabled = false;
@@ -773,9 +773,7 @@
   }
 
   function rendererPageUrl(ground) {
-    var device = ground.device === "mini" ? "mini" : "pro";
-    return "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/" +
-      device + ".html?ground=" + encodeURIComponent(ground.id) + "&device=" + device;
+    return resolvedFor(ground.id);
   }
 
   function srtPullUrl(id) {
@@ -827,7 +825,7 @@
       id: id,
       idTouched: true,
       shortLink: "",
-      device: source.device || "pro",
+      device: window.PulsePlayDevice.savedDevice(),
       score: "",
       age: source.logos ? source.logos.age_group_sponsor : "",
       tournament: source.logos ? source.logos.tournament : "",
@@ -949,8 +947,8 @@
     card.tabIndex = 0;
     head.className = "card__head";
     name.className = "card__name";
-    pill.className = ground.device === "mini" ? "pill pill--mini" : "pill";
-    setText(pill, ground.device === "mini" ? "Mini" : "Pro");
+    pill.className = "pill";
+    setText(pill, deviceLabel());
     head.appendChild(name);
     head.appendChild(pill);
     var badge = document.createElement("span");
@@ -1504,7 +1502,7 @@
     document.getElementById("field-id").value = draft.id;
     idTouched = draft.idTouched;
     document.getElementById("field-short").value = draft.shortLink;
-    document.getElementById("field-device").value = draft.device;
+    document.getElementById("field-device").value = window.PulsePlayDevice.savedDevice();
     document.getElementById("field-score").value = draft.score;
     document.getElementById("field-external").checked = !!draft.external;
     document.getElementById("field-ticker").checked = draft.ticker !== false;
@@ -1604,7 +1602,7 @@
         document.getElementById("field-name").value = "";
         document.getElementById("field-id").value = "";
         document.getElementById("field-short").value = "";
-        document.getElementById("field-device").value = "pro";
+        document.getElementById("field-device").value = window.PulsePlayDevice.savedDevice();
         document.getElementById("field-score").value = "";
         document.getElementById("field-external").checked = false;
         document.getElementById("field-ticker").checked = true;
@@ -1624,11 +1622,11 @@
       document.getElementById("field-name").value = ground.name;
       document.getElementById("field-id").value = ground.id;
       document.getElementById("field-short").value = ground.short_link;
-      document.getElementById("field-device").value = ground.device;
+      document.getElementById("field-device").value = window.PulsePlayDevice.savedDevice();
       document.getElementById("field-score").value = ground.score_url;
       document.getElementById("field-external").checked = ground.external_video_audio === true;
       document.getElementById("field-ticker").checked = ground.show_subscribe_ticker !== false;
-      setText(document.getElementById("field-resolved"), "Resolves to " + ground.resolved_url);
+      setText(document.getElementById("field-resolved"), "Resolves to " + resolvedFor(ground.id));
       writeLayoutForm(ground.layout);
       refreshScoreWarn();
     } else {
@@ -1972,7 +1970,7 @@
     var name = document.getElementById("field-name").value.replace(/^\s+|\s+$/g, "");
     var id = document.getElementById("field-id").value.replace(/^\s+|\s+$/g, "");
     var shortLink = document.getElementById("field-short").value.replace(/^\s+|\s+$/g, "");
-    var device = document.getElementById("field-device").value;
+    var device = window.PulsePlayDevice.savedDevice();
     var scoreUrl = document.getElementById("field-score").value.replace(/^\s+|\s+$/g, "");
     var existing = isNew ? null : findGround(currentDoc, select.value);
     var ground;
@@ -2024,7 +2022,7 @@
       name: name,
       short_link: shortLink,
       device: device,
-      resolved_url: resolvedFor(id, device),
+      resolved_url: resolvedFor(id),
       score_url: scoreUrl,
       score_overlays: freshScoreOverlays(existing, id, scoreUrl),
       logos: {

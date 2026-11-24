@@ -166,7 +166,7 @@
         <h2>Ad Library</h2>
         <p id="ad-library-intro">Upload an MP4, PNG, JPG, or a one-page PDF (saved as a PNG). It's stored in Pulse Play storage and becomes selectable in Ground setup. Each YoloBox preloads the ads assigned to its ground so switching is instant, so keep videos compressed (about 20–40 MB, 1080p).</p>
       </div>
-      <p class="hint" id="ad-return-note">Every video returns to Logos + Score when it finishes, on every ground, Pro and Mini. An image stays until you switch.</p>
+      <p class="hint" id="ad-return-note">Every video returns to Logos + Score when it finishes, on every ground. An image stays until you switch.</p>
       <form id="ad-form" class="form">
         <label>Label <input id="ad-label" type="text" required></label>
         <label>Description <input id="ad-description" type="text"></label>
@@ -209,7 +209,7 @@
     <section id="panel-setup" class="is-off" aria-label="Ground setup">
       <div class="center-head">
         <h2>Ground setup</h2>
-        <p>One short URL per ground. The renderer URL is that ground's id plus Pro or Mini. Assign only the ads this game should offer.</p>
+        <p>One short URL per ground. YoloBox Pro and YoloBox Ultra both use pro.html with that ground's id and device=pro. Assign only the ads this game should offer.</p>
       </div>
       <p id="setup-empty" class="note is-off">No grounds yet. This form adds the first one. Overlay pages stay transparent until a ground is saved.</p>
       <p id="logo-pick-empty" class="note is-off">The logo library is empty. Add marks on the Logo Library tab, then pick them for the three corners.</p>
@@ -225,10 +225,10 @@
         <p class="field-error" id="err-short"></p>
         <label>Device
           <select id="field-device">
-            <option value="pro">YoloBox Pro</option>
-            <option value="mini">YoloBox Mini</option>
+            <option value="pro">YoloBox Pro / Ultra</option>
           </select>
         </label>
+        <p class="hint" id="field-device-note">Pro and Ultra use the same overlay. Saving writes device=pro.</p>
         <label>CricClubs overlay URL <input id="field-score" type="text"></label>
         <p class="field-error" id="err-score"></p>
         <p class="hint" id="field-score-warn"></p>
@@ -258,7 +258,7 @@
 
         <fieldset>
           <legend>Layout</legend>
-          <p class="hint">Each slider is a percent of that device's base size. Nudge is pixels on the 1920×1080 stage. Positive X moves right. Positive Y moves down. Logos fit inside the slot, so a square mark and a wide mark stay in the same box. Save ground to send it to the YoloBox.</p>
+          <p class="hint">Each slider is a percent of the YoloBox Pro / Ultra base size. Nudge is pixels on the 1920×1080 stage. Positive X moves right. Positive Y moves down. Logos fit inside the slot, so a square mark and a wide mark stay in the same box. Save ground to send it to the YoloBox.</p>
           <div id="layout-controls" class="layout-controls"></div>
           <button type="button" id="btn-layout-reset" class="btn-text">Reset to default</button>
         </fieldset>
@@ -334,6 +334,7 @@
   <script src="js/supabase-store.js"></script>
   <script src="js/score-frame.js"></script>
   <script src="js/layout.js"></script>
+  <script src="js/overlay-target.js"></script>
   <script src="js/youtube-broadcasts.js"></script>
   <script src="js/broadcasts.js"></script>
   <script src="js/stream-labels.js"></script>
