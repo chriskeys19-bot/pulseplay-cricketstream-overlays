@@ -807,14 +807,20 @@
     var sy;
     var next;
     if (!score || !bar) return;
+    if (window.PulsePlayLayout && window.PulsePlayLayout.alignTicker) {
+      window.PulsePlayLayout.alignTicker(score, bar);
+    }
     bottom = parseFloat(score.style.bottom);
     height = parseFloat(score.style.height);
     sy = parseFloat(score.style.getPropertyValue("--score-sy"));
     if (!sy) sy = 1;
     if (isNaN(bottom) || isNaN(height)) return;
-    /* Sit above the painted score. --score-sy is 2.15 for the short
-       overlay.cricclubs.com bar and 1 for a full-size page. */
-    next = Math.round(bottom + height * sy + 10) + "px";
+    /* Sit above the painted score, using the score bar's left and width.
+       --score-sy is 2.15 for the short overlay.cricclubs.com bar and 1
+       for a full-size page. Keep the line inside the 1080px stage. */
+    next = window.PulsePlayLayout && window.PulsePlayLayout.tickerBottom
+      ? window.PulsePlayLayout.tickerBottom(bottom, height, sy, bar.offsetHeight || 48) + "px"
+      : Math.round(bottom + height * sy + 10) + "px";
     if (bar.style.bottom !== next) bar.style.bottom = next;
   }
 
@@ -983,7 +989,8 @@
         age: document.getElementById("logo-age"),
         tournament: document.getElementById("logo-tournament"),
         cricketcraze: document.getElementById("logo-ccusa"),
-        score: document.getElementById("score-slot")
+        score: document.getElementById("score-slot"),
+        ticker: document.getElementById("subscribe-ticker")
       });
     }
     setScore(ground);

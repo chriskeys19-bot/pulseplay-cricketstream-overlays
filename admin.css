@@ -289,11 +289,19 @@ legend { color: #c5cebb; font-size: 13px; font-weight: 700; }
 .layout-stage .logo-age { object-position: left top; }
 .layout-stage .logo-tournament { object-position: right top; }
 .layout-stage .logo-ccusa { object-position: right bottom; }
-.layout-score { position: absolute; overflow: visible; }
+.layout-score {
+  position: absolute;
+  left: 66px;
+  bottom: 28px;
+  width: 1560px;
+  height: 297px;
+  overflow: visible;
+}
 .layout-ticker {
   position: absolute;
-  left: 64px;
-  right: 64px;
+  left: 66px;
+  right: auto;
+  width: 1560px;
   height: 48px;
   overflow: hidden;
   background: rgba(7, 20, 12, 0.78);
