@@ -2,7 +2,7 @@
    read on the Mini's smaller panel. overlay.js scales the stage to the widget. */
 #stage { width: 1920px; height: 1080px; }
 .logo-age { position: absolute; top: 18px; left: 36px; width: 224px; }
-.logo-tournament { position: absolute; right: 28px; top: 18px; width: 158px; }
+.logo-tournament { position: absolute; right: 28px; top: 18px; width: 211px; }
 .logo-ccusa { position: absolute; right: 28px; bottom: 13px; width: 220px; }
 #score-slot {
   left: 50%;

@@ -13,13 +13,13 @@
   var BASE = {
     pro: {
       age: { left: 40, top: 20, w: 168, h: 84 },
-      tournament: { right: 40, top: 20, w: 135, h: 105 },
+      tournament: { right: 40, top: 20, w: 180, h: 140 },
       cricketcraze: { right: 40, bottom: 20, w: 190, h: 146 },
       score: { bottom: 28, w: 1560, h: 297 }
     },
     mini: {
       age: { left: 36, top: 18, w: 224, h: 112 },
-      tournament: { right: 28, top: 18, w: 158, h: 123 },
+      tournament: { right: 28, top: 18, w: 211, h: 164 },
       cricketcraze: { right: 28, bottom: 13, w: 220, h: 169 },
       score: { bottom: 20, w: 1734, h: 372 }
     }
