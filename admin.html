@@ -35,6 +35,7 @@
 
     <nav class="tabs" aria-label="Dashboard">
       <button type="button" id="tab-streams" class="tab is-active">Streams</button>
+      <button type="button" id="tab-wall" class="tab">Live Wall</button>
       <button type="button" id="tab-setup-home" class="tab">Setup</button>
       <button type="button" id="tab-broadcasts" class="tab">Broadcasts</button>
       <button type="button" id="tab-access" class="tab">Access</button>
@@ -301,6 +302,27 @@
       </form>
     </section>
 
+    <section id="panel-wall" class="is-off" aria-label="Live Wall">
+      <div class="wall-chrome" id="wall-chrome">
+        <div class="center-head">
+          <h2>Live Wall</h2>
+          <p id="wall-intro">Muted multi-view for a TV laptop. Every tile stays silent. A game is on the wall when its status or the YouTube broadcast is live, including a broadcast still in testing. If that status is empty, the wall uses the scheduled window: 15 minutes before the start until 3 hours 30 minutes after. Ended stays off. Up to 8 games, earliest explicit live games first.</p>
+        </div>
+        <div class="wall-toolbar">
+          <button type="button" id="wall-kiosk">Hide chrome</button>
+          <button type="button" id="wall-fullscreen">Fullscreen wall</button>
+          <button type="button" id="wall-sample">Preview sample games</button>
+          <p id="wall-status" class="hint" role="status"></p>
+          <p id="wall-note" class="hint" role="status"></p>
+        </div>
+      </div>
+      <div id="wall-grid" class="wall-grid" data-layout="1" data-columns="1"></div>
+      <div id="wall-empty" class="wall-empty is-off">
+        <p>No games are live right now.</p>
+      </div>
+      <button type="button" id="wall-exit-fs" class="is-off">Exit fullscreen</button>
+    </section>
+
     <section id="panel-broadcasts" class="is-off" aria-label="Broadcasts">
       <div class="center-head">
         <h2>Broadcasts</h2>
@@ -330,13 +352,17 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.81.1/dist/umd/supabase.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="config/runtime.js"></script>
+  <script src="js/pp-supabase.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/supabase-store.js"></script>
   <script src="js/score-frame.js"></script>
   <script src="js/layout.js"></script>
   <script src="js/youtube-broadcasts.js"></script>
-  <script src="js/broadcasts.js"></script>
   <script src="js/stream-labels.js"></script>
+  <script src="js/live-wall.js"></script>
+  <script src="js/pp-tabs.js"></script>
+  <script src="js/live-wall-page.js"></script>
+  <script src="js/broadcasts.js"></script>
   <script src="js/streams.js"></script>
   <script src="js/access.js"></script>
   <script src="admin.js"></script>

@@ -4,7 +4,6 @@
  */
 (function () {
   var rules = window.PulsePlayYouTube;
-  var client = null;
   var streams = [];
   var lifeById = {};
   var youtubeNote = "";
@@ -28,14 +27,8 @@
   }
 
   function liveClient() {
-    var runtime = window.PulsePlayRuntime || {};
-    if (client) return client;
-    if (!window.supabase || !window.supabase.createClient) return null;
-    if (runtime.adapter !== "supabase" || !runtime.supabaseUrl || !runtime.supabaseKey) return null;
-    client = window.supabase.createClient(runtime.supabaseUrl, runtime.supabaseKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-    });
-    return client;
+    if (window.PulsePlaySupabase && window.PulsePlaySupabase.get) return window.PulsePlaySupabase.get();
+    return null;
   }
 
   function readError(error) {

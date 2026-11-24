@@ -1688,18 +1688,20 @@
   function showTab(name) {
     var setupPanels = ["controls", "center", "library", "logos", "setup", "ticker"];
     var main;
-    if (accessRole === "operator") name = "streams";
-    main = name === "streams" || name === "broadcasts" || name === "access" ? name : "setup";
+    if (accessRole === "operator" && name !== "streams" && name !== "wall") name = "streams";
+    main = name === "streams" || name === "broadcasts" || name === "access" || name === "wall" ? name : "setup";
     var section = main === "setup" ? (name === "setup-home" ? setupSection : name) : "";
     var i;
     var panel;
     var tab;
     if (main === "setup" && section) setupSection = section;
     setTabState("tab-streams", main === "streams");
+    setTabState("tab-wall", main === "wall");
     setTabState("tab-setup-home", main === "setup");
     setTabState("tab-broadcasts", main === "broadcasts");
     setTabState("tab-access", main === "access");
     document.getElementById("panel-streams").classList.toggle("is-off", main !== "streams");
+    document.getElementById("panel-wall").classList.toggle("is-off", main !== "wall");
     document.getElementById("panel-broadcasts").classList.toggle("is-off", main !== "broadcasts");
     document.getElementById("panel-access").classList.toggle("is-off", main !== "access");
     document.getElementById("setup-subnav").classList.toggle("is-off", main !== "setup");
@@ -1722,6 +1724,8 @@
     if (main === "streams" && window.PulsePlayStreams) window.PulsePlayStreams.show();
     if (main === "broadcasts" && window.PulsePlayBroadcasts) window.PulsePlayBroadcasts.show();
     if (main === "access" && window.PulsePlayAccessTab) window.PulsePlayAccessTab.show();
+    if (main === "wall" && window.PulsePlayLiveWall) window.PulsePlayLiveWall.show();
+    else if (window.PulsePlayLiveWall) window.PulsePlayLiveWall.hide();
   }
 
   function setTabState(id, on) {
@@ -1752,6 +1756,11 @@
   }
 
   function maybeOpenBroadcasts() {
+    if (queryValue("tab") === "wall") {
+      showTab("wall");
+      return;
+    }
+    if (accessRole === "operator") return;
     if (queryValue("tab") === "broadcasts" || queryValue("youtube")) showTab("broadcasts");
   }
 
@@ -2426,6 +2435,7 @@
   }
 
   document.getElementById("tab-streams").onclick = function () { showTab("streams"); };
+  document.getElementById("tab-wall").onclick = function () { showTab("wall"); };
   document.getElementById("tab-setup-home").onclick = function () { showTab("setup-home"); };
   document.getElementById("tab-controls").onclick = function () { showTab("controls"); };
   document.getElementById("tab-center").onclick = function () { showTab("center"); };
@@ -2636,7 +2646,7 @@
       dashboardStarted = true;
       boot();
     }
-    if (role === "admin") maybeOpenBroadcasts();
+    maybeOpenBroadcasts();
     if (window.PulsePlayStreams && !document.getElementById("panel-streams").classList.contains("is-off")) {
       window.PulsePlayStreams.show();
     }
@@ -2758,14 +2768,8 @@
       if (session) admitSession(session);
     });
   } else {
-    authClient = window.supabase.createClient(window.PulsePlayRuntime.supabaseUrl, window.PulsePlayRuntime.supabaseKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        flowType: "pkce"
-      }
-    });
+    authClient = window.PulsePlaySupabase.get();
+    if (window.PulsePlayTabs) window.PulsePlayTabs.attach(authClient);
     var inviteToken = queryValue("token_hash");
     var inviteType = queryValue("type");
     if (inviteToken && (inviteType === "magiclink" || inviteType === "invite" || inviteType === "email" || inviteType === "signup")) {
@@ -2783,6 +2787,10 @@
           dashboardStarted = false;
           showSignIn();
         });
+        return;
+      }
+      if (event === "TOKEN_REFRESHED") {
+        if (session) store.adoptSession(session);
         return;
       }
       if (event !== "INITIAL_SESSION" && event !== "SIGNED_IN") return;
