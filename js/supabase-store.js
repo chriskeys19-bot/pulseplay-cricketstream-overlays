@@ -162,7 +162,16 @@
     }
 
     function getSession(callback) {
-      var session = readSession();
+      var bridge = global.PulsePlaySupabase;
+      var session;
+      if (bridge && bridge.ready && bridge.ready() && bridge.currentSession) {
+        bridge.currentSession(function (live) {
+          if (!live || !live.access_token) { callback(null); return; }
+          adoptSession(live, function () { callback(readSession()); });
+        });
+        return;
+      }
+      session = readSession();
       if (!session) { callback(null); return; }
       if (session.expires_at > new Date().getTime() + 60000) { callback(session); return; }
       refresh(session, function (err, next) {
