@@ -3,18 +3,23 @@
  * Device CSS is the 100% size. A ground layout multiplies that size and
  * nudges the anchor. A logo's own scale multiplies the slot again.
  * Missing layout means the current shipped sizes.
+ * Age is top-left, the tournament logo is top-right, and CricketCrazeUSA
+ * is bottom-right. The tournament logo shares the age logo's top inset and
+ * the CricketCrazeUSA logo's right inset. Positive x moves right. Positive
+ * y moves down. Ground rows store only those nudges and a scale, so this
+ * anchor is what places the tournament logo on every ground.
  */
 (function (global) {
   var BASE = {
     pro: {
       age: { left: 40, top: 20, w: 168, h: 84 },
-      tournament: { left: 40, bottom: 40, w: 135, h: 105 },
+      tournament: { right: 40, top: 20, w: 135, h: 105 },
       cricketcraze: { right: 40, bottom: 20, w: 190, h: 146 },
       score: { bottom: 28, w: 1560, h: 297 }
     },
     mini: {
       age: { left: 36, top: 18, w: 224, h: 112 },
-      tournament: { left: 28, bottom: 36, w: 158, h: 123 },
+      tournament: { right: 28, top: 18, w: 158, h: 123 },
       cricketcraze: { right: 28, bottom: 13, w: 220, h: 169 },
       score: { bottom: 20, w: 1734, h: 372 }
     }
@@ -96,13 +101,15 @@
       el.style.top = (base.top + slot.y) + "px";
       return;
     }
+    if (anchor === "top-right") {
+      el.style.right = (base.right - slot.x) + "px";
+      el.style.top = (base.top + slot.y) + "px";
+      return;
+    }
     if (anchor === "bottom-right") {
       el.style.right = (base.right - slot.x) + "px";
       el.style.bottom = (base.bottom - slot.y) + "px";
-      return;
     }
-    el.style.left = (base.left + slot.x) + "px";
-    el.style.bottom = (base.bottom - slot.y) + "px";
   }
 
   function placeScore(el, base, slot) {
@@ -125,7 +132,7 @@
     var layout = normalize(opts && opts.layout);
     var scales = (opts && opts.scales) || {};
     placeLogo(opts.age, base.age, layout.age, scales.age, "top");
-    placeLogo(opts.tournament, base.tournament, layout.tournament, scales.tournament, "bottom-left");
+    placeLogo(opts.tournament, base.tournament, layout.tournament, scales.tournament, "top-right");
     placeLogo(opts.cricketcraze, base.cricketcraze, layout.cricketcraze, scales.cricketcraze, "bottom-right");
     placeScore(opts.score, base.score, layout.score);
   }

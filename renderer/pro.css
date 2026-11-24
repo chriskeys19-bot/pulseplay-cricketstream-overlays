@@ -1,7 +1,7 @@
 /* YoloBox Pro. Explicit 1920×1080 stage. overlay.js scales it to the widget. */
 #stage { width: 1920px; height: 1080px; }
 .logo-age { position: absolute; top: 20px; left: 40px; width: 168px; }
-.logo-tournament { position: absolute; left: 40px; bottom: 40px; width: 135px; }
+.logo-tournament { position: absolute; right: 40px; top: 20px; width: 135px; }
 .logo-ccusa { position: absolute; right: 40px; bottom: 20px; width: 190px; }
 #score-slot {
   left: 50%;

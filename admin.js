@@ -1245,10 +1245,10 @@
   }
 
   var LAYOUT_LABELS = {
-    age: "Age group",
-    tournament: "Tournament",
-    cricketcraze: "CricketCrazeUSA",
-    score: "Score"
+    age: "Top left · Age group",
+    tournament: "Top right · Tournament",
+    cricketcraze: "Bottom right · CricketCrazeUSA",
+    score: "Bottom center · Score"
   };
 
   function layoutField(id, type, min, max, step, value) {
