@@ -98,6 +98,63 @@
     return life === "complete" || life === "revoked" || life === "ended";
   }
 
+  function httpUrl(value) {
+    var text = String(value || "").replace(/^\s+|\s+$/g, "");
+    if (!/^https?:\/\//i.test(text)) return "";
+    return text;
+  }
+
+  function matchTitle(row) {
+    var teams = (row.team1 || "") + " vs " + (row.team2 || "");
+    var code = window.PulsePlayStreamLabels ? window.PulsePlayStreamLabels.tournamentName(row) : "";
+    return code ? code + " · " + teams : teams;
+  }
+
+  function copyText(text, button) {
+    function markCopied() {
+      if (button.copyTimer) window.clearTimeout(button.copyTimer);
+      setText(button, "Copied");
+      button.copyTimer = window.setTimeout(function () {
+        setText(button, button.getAttribute("data-label") || "Copy");
+      }, 1500);
+    }
+    function fallback() {
+      var area = document.createElement("textarea");
+      var copied = false;
+      area.value = text;
+      area.setAttribute("readonly", "readonly");
+      area.style.position = "fixed";
+      area.style.top = "0";
+      area.style.left = "0";
+      area.style.width = "1px";
+      area.style.height = "1px";
+      area.style.opacity = "0";
+      area.style.fontSize = "16px";
+      document.body.appendChild(area);
+      area.focus();
+      area.select();
+      area.setSelectionRange(0, area.value.length);
+      try { copied = document.execCommand("copy"); } catch (e) { copied = false; }
+      document.body.removeChild(area);
+      if (copied) markCopied();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(markCopied).catch(fallback);
+      return;
+    }
+    fallback();
+  }
+
+  function copyButton(text) {
+    var node = document.createElement("button");
+    node.type = "button";
+    node.className = "btn-copy";
+    node.setAttribute("data-label", "Copy");
+    setText(node, "Copy");
+    node.onclick = function () { copyText(text, node); };
+    return node;
+  }
+
   function groundIdFor(name) {
     var key = String(name || "").toLowerCase();
     var list;
@@ -259,18 +316,41 @@
       card = document.createElement("article");
       card.className = "stream-row";
       title = document.createElement("p");
-      setText(title, row.team1 + " vs " + row.team2);
+      title.className = "stream-title";
+      var titleText = document.createElement("span");
+      var scorecard = httpUrl(row.scorecard_url);
+      var scoreLink;
+      setText(titleText, matchTitle(row));
+      title.appendChild(titleText);
+      if (scorecard) {
+        scoreLink = document.createElement("a");
+        scoreLink.href = scorecard;
+        scoreLink.target = "_blank";
+        scoreLink.rel = "noopener noreferrer";
+        setText(scoreLink, "Scorecard");
+        title.appendChild(scoreLink);
+        title.appendChild(copyButton(scorecard));
+      }
       card.appendChild(title);
       meta = document.createElement("p");
       life = lifeOf(row);
       setText(meta, row.division + " · " + timeLine(row) + " · " + (row.stream_key || "No encoder") + " · " + (life ? rules.lifeCycleLabel(life) : "Not live"));
       card.appendChild(meta);
       watch = document.createElement("p");
-      watch.className = "broadcast-watch";
-      setText(watch, "https://www.youtube.com/watch?v=" + row.video_id);
+      watch.className = "stream-link";
+      var watchText = document.createElement("span");
+      watchText.className = "broadcast-watch";
+      setText(watchText, "https://www.youtube.com/watch?v=" + row.video_id);
+      watch.appendChild(watchText);
+      watch.appendChild(copyButton("https://www.youtube.com/watch?v=" + row.video_id));
       card.appendChild(watch);
       overlay = document.createElement("p");
-      setText(overlay, "Overlay: " + (row.overlay_url || "not set yet"));
+      overlay.className = "stream-link";
+      var overlayText = document.createElement("span");
+      var overlayUrl = httpUrl(row.overlay_url);
+      setText(overlayText, "Overlay: " + (row.overlay_url || "not set yet"));
+      overlay.appendChild(overlayText);
+      if (overlayUrl) overlay.appendChild(copyButton(overlayUrl));
       card.appendChild(overlay);
       actions = document.createElement("div");
       actions.className = "stream-actions broadcast-actions";
@@ -433,6 +513,12 @@
         return;
       }
       paintNote();
+      paint();
+    },
+    preview: function (rows) {
+      streams = rows || [];
+      connected = true;
+      fillFilters();
       paint();
     }
   };
