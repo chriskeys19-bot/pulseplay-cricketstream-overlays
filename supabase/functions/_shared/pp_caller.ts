@@ -1,11 +1,18 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.81.1'
 import { serviceClient } from './club_user.ts'
 import { resolvePulsePlayCaller } from './pp_admin.ts'
-import { type Caller } from './pp_access.ts'
+import { type Caller, type PulsePlayDecision } from './pp_access.ts'
 
-export async function requireBroadcastCaller(
+export type PulsePlayUser = {
+  userId: string
+  email: string | null
+  emailConfirmedAt: string | null
+  decision: PulsePlayDecision
+}
+
+export async function requirePulsePlayUser(
   req: Request,
-): Promise<{ caller: Caller; userId: string } | { status: number; error: string }> {
+): Promise<PulsePlayUser | { status: number; error: string }> {
   const authHeader = req.headers.get('Authorization') ?? ''
   const jwt = authHeader.replace(/^Bearer\s+/i, '').trim()
   if (!jwt || jwt.split('.').length !== 3) return { status: 401, error: 'Sign in again.' }
@@ -37,8 +44,31 @@ export async function requireBroadcastCaller(
   if (!admin) return { status: 500, error: 'Streams are not available right now.' }
   const decision = await resolvePulsePlayCaller(admin, user, { role, access })
   if (decision.kind === 'error') return { status: 500, error: 'Streams are not available right now.' }
-  if (decision.kind === 'admin') return { caller: { admin: true }, userId: user.id }
+  return {
+    userId: user.id,
+    email: user.email ?? null,
+    emailConfirmedAt: user.email_confirmed_at ?? null,
+    decision,
+  }
+}
+
+export function callerFromDecision(
+  decision: PulsePlayDecision,
+): { caller: Caller } | { status: number; error: string } {
+  if (decision.kind === 'admin') return { caller: { admin: true } }
+  if (decision.kind === 'scoped') return { caller: { admin: false, active: true, divisions: [], scopes: decision.grants } }
   if (decision.kind === 'pending') return { status: 403, error: 'Your club access is still pending.' }
-  if (decision.kind === 'operator') return { caller: { admin: false, active: true, divisions: decision.divisions }, userId: user.id }
+  if (decision.kind === 'invited') return { status: 403, error: 'Your Pulse Play invite is not active yet. Ask an admin to resend it.' }
+  if (decision.kind === 'operator') return { caller: { admin: false, active: true, divisions: decision.divisions } }
   return { status: 403, error: 'Only a Pulse Play admin or division operator can do that.' }
+}
+
+export async function requireBroadcastCaller(
+  req: Request,
+): Promise<{ caller: Caller; userId: string } | { status: number; error: string }> {
+  const user = await requirePulsePlayUser(req)
+  if ('error' in user) return user
+  const caller = callerFromDecision(user.decision)
+  if ('error' in caller) return caller
+  return { caller: caller.caller, userId: user.userId }
 }

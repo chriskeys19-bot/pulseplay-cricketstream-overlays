@@ -388,9 +388,18 @@ input, select, textarea, button { font-size: 16px; }
   cursor: pointer;
   touch-action: manipulation;
 }
-.stream-actions button, .access-division button, .access-actions button { min-height: 44px; }
-.access-division { margin: 0 0 14px; }
-.access-division input { display: block; width: 100%; max-width: 420px; min-height: 44px; margin-top: 4px; }
+.stream-actions button, .access-division button, .access-actions button, .access-form button, .access-edit button, .access-link-wrap button {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+.access-form input, .access-form select, .access-edit input, .access-edit select, .access-link-field input, #access-link {
+  font-size: 16px;
+  min-height: 44px;
+}
+.access-link-wrap, .access-edit { margin: 0 0 14px; }
+.access-link-field { display: block; margin-top: 8px; color: #c5cebb; font-size: 13px; font-weight: 700; }
+.access-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.access-actions button { margin: 0; }
 .subtabs { margin-top: 0; }
 @media (max-width: 720px) {
   .stream-actions button, .broadcast-actions button { display: block; width: 100%; margin: 0 0 8px; }

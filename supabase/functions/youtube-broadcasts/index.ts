@@ -1,7 +1,8 @@
 import { json, preflight, redactForLog } from '../_shared/http.ts'
 import { oauthSecrets, serviceClient } from '../_shared/club_user.ts'
 import { requireBroadcastCaller } from '../_shared/pp_caller.ts'
-import { authorizeBroadcast, type StreamRow } from '../_shared/pp_access.ts'
+import { authorizeBroadcast, seesYoutubeConnection, type StreamRow } from '../_shared/pp_access.ts'
+import { broadcastsInScope } from '../_shared/pp_scope.ts'
 import { readOauthToken } from '../_shared/youtube_oauth.ts'
 import {
   RECENT_ENDED_MS,
@@ -110,7 +111,7 @@ Deno.serve(async (req: Request) => {
   if ('error' in staff) return json(req, staff.status, { error: staff.error })
   const caller = staff.caller
   const respond = (status: number, body: Record<string, unknown>) => {
-    if (!caller.admin) {
+    if (!seesYoutubeConnection(caller)) {
       const copy = { ...body }
       delete copy.connection
       return json(req, status, copy)
@@ -141,13 +142,18 @@ Deno.serve(async (req: Request) => {
   if ((action === 'start' || action === 'end') && /^[A-Za-z0-9_-]{6,80}$/.test(requestedId)) {
     const found = await admin
       .from('pp_streams')
-      .select('id, video_id, division')
+      .select('id, video_id, division, event')
       .or(`id.eq.${requestedId},video_id.eq.${requestedId}`)
     if (found.error) return respond(500, { error: 'Streams are not available right now.' })
     streamRows = []
     for (const item of found.data ?? []) {
       if (!item || typeof item.id !== 'string' || typeof item.video_id !== 'string' || typeof item.division !== 'string') continue
-      streamRows.push({ id: item.id, videoId: item.video_id, division: item.division })
+      streamRows.push({
+        id: item.id,
+        videoId: item.video_id,
+        division: item.division,
+        tournament: typeof item.event === 'string' ? item.event : '',
+      })
     }
   }
   const decision = authorizeBroadcast({ caller, action, requestedId, rows: streamRows })
@@ -208,7 +214,22 @@ Deno.serve(async (req: Request) => {
       const stamp = Date.parse(row.actualEnd ?? row.scheduledStart ?? '')
       return Number.isFinite(stamp) && now - stamp <= RECENT_ENDED_MS
     })
-    const broadcasts = await withStreamKeys(admin, call, refreshed.accessToken, fresh)
+    let broadcasts = await withStreamKeys(admin, call, refreshed.accessToken, fresh)
+    if (!caller.admin) {
+      const catalog = await admin.from('pp_streams').select('video_id, division, event')
+      if (catalog.error) return respond(500, { error: 'Streams are not available right now.' })
+      const streams: StreamRow[] = []
+      for (const item of catalog.data ?? []) {
+        if (!item || typeof item.video_id !== 'string' || typeof item.division !== 'string') continue
+        streams.push({
+          id: item.video_id,
+          videoId: item.video_id,
+          division: item.division,
+          tournament: typeof item.event === 'string' ? item.event : '',
+        })
+      }
+      broadcasts = broadcastsInScope(caller, broadcasts, streams)
+    }
     return respond(200, { connection: liveConnection, broadcasts })
   }
 

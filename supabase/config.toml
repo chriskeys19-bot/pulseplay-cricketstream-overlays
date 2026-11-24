@@ -27,3 +27,11 @@ verify_jwt = false
 
 [functions.youtube-broadcasts]
 verify_jwt = true
+
+# pp-access grants Pulse Play scopes and sends invites. The gateway requires
+# a user JWT. The handler calls getUser and allows full admins, plus
+# tournament admins inside their tournament. Options must use preflight():
+# a 204 response cannot have a body.
+
+[functions.pp-access]
+verify_jwt = true

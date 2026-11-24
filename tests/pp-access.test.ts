@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { json, preflight } from '../supabase/functions/_shared/http.ts'
 import {
   ADMIN_PAGE,
   authorizeBroadcast,
@@ -129,4 +130,26 @@ test('the invite letter names the division and the GitHub Pages admin page', () 
   assert.match(source, /PP_INVITE_SMTP_PASS/)
   assert.equal(source.includes("get('INVITE_SMTP_"), false)
   assert.equal(source.includes('cheetahscc123'), false)
+  assert.match(source, /preflight\(req\)/)
+  assert.equal(source.includes('json(req, 204'), false)
+  assert.match(source, /inviteUserByEmail/)
+  assert.match(source, /generateLink/)
+  assert.equal(source.includes('SUPABASE_PAT'), false)
+})
+
+test('OPTIONS preflight is an empty 204 and json refuses to attach a body', async () => {
+  const response = preflight(new Request('https://example.test/pp-access', {
+    method: 'OPTIONS',
+    headers: { Origin: 'https://chriskeys19-bot.github.io' },
+  }))
+  assert.equal(response.status, 204)
+  assert.equal(await response.text(), '')
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://chriskeys19-bot.github.io')
+  assert.throws(
+    () => json(new Request('https://example.test/pp-access'), 204, {}),
+    /204/,
+  )
+  const youtube = readFileSync(new URL('../supabase/functions/youtube-broadcasts/index.ts', import.meta.url), 'utf8')
+  assert.match(youtube, /preflight\(req\)/)
+  assert.equal(youtube.includes('json(req, 204'), false)
 })

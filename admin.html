@@ -61,11 +61,40 @@
     <section id="panel-access" class="is-off" aria-label="Access">
       <div class="center-head">
         <h2>Access</h2>
-        <p>Invite one operator per division. You can add another person to a division, or give one person more than one division. They only see their games.</p>
+        <p>Add a person by email. If they already have an account, access turns on immediately. Otherwise they get an invite. A full admin covers every tournament. A tournament admin covers one tournament. An age-group operator covers that age group in one tournament, or in every tournament.</p>
       </div>
       <p id="access-note" class="broadcast-notice is-off" role="status"></p>
-      <div id="access-divisions"></div>
-      <h3>Operators</h3>
+      <div id="access-link-wrap" class="access-link-wrap is-off">
+        <label>Invite link
+          <input id="access-link" type="text" readonly>
+        </label>
+        <button type="button" id="access-copy">Copy invite link</button>
+        <p class="hint">Copying a new link can make an older link in an email stop working.</p>
+      </div>
+      <form id="access-form" class="form access-form" novalidate>
+        <label>Email <input id="access-email" type="email" autocomplete="email" inputmode="email" required></label>
+        <label>Scope
+          <select id="access-scope">
+            <option value="all">All tournaments</option>
+            <option value="tournament">Tournament</option>
+            <option value="division">Age group</option>
+          </select>
+        </label>
+        <label id="access-tournament-label" class="is-off">Tournament
+          <select id="access-tournament"></select>
+        </label>
+        <label id="access-division-label" class="is-off">Age group
+          <select id="access-division"></select>
+        </label>
+        <label>Role
+          <select id="access-role">
+            <option value="admin">Admin</option>
+            <option value="operator">Operator</option>
+          </select>
+        </label>
+        <button type="submit" id="access-submit">Add</button>
+      </form>
+      <h3>Grants</h3>
       <div id="access-list"></div>
     </section>
 
@@ -362,6 +391,7 @@
   <script src="js/stream-labels.js"></script>
   <script src="js/live-wall.js"></script>
   <script src="js/pp-tabs.js"></script>
+  <script src="js/scope.js"></script>
   <script src="js/live-wall-page.js"></script>
   <script src="js/broadcasts.js"></script>
   <script src="js/streams.js"></script>

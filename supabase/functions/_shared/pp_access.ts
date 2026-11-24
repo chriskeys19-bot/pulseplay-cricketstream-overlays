@@ -1,5 +1,7 @@
 // Division operators for Pulse Play. Pure checks only: no network, no secrets.
 
+import { grantCoversStream, isFullAdminGrant, type AccessGrant } from './pp_scope.ts'
+
 export const DIVISIONS = ['U9', 'U11', 'U13', 'U15'] as const
 export const ADMIN_PAGE = 'https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/admin.html'
 export const SMTP_MAILBOX = 'cricketcrazeusa@gmail.com'
@@ -11,11 +13,12 @@ export type StreamRow = {
   id: string
   videoId: string
   division: string
+  tournament?: string
 }
 
 export type Caller =
   | { admin: true }
-  | { admin: false; active: boolean; divisions: string[] }
+  | { admin: false; active: boolean; divisions: string[]; scopes?: AccessGrant[] }
 
 export function normalizeEmail(value: unknown): string | null {
   if (typeof value !== 'string') return null
@@ -90,6 +93,30 @@ export function smtpReady(user: string, pass: string): boolean {
   return smtpFailure(user, pass) === null
 }
 
+export function smtpMode(user: string, pass: string): 'ready' | 'unset' | 'invalid' {
+  if (!user.trim() && !pass.replace(/\s+/g, '')) return 'unset'
+  return smtpFailure(user, pass) ? 'invalid' : 'ready'
+}
+
+export function scopeInviteLetter(label: string, link: string): { subject: string; text: string } | null {
+  const phrase = label.trim()
+  if (!phrase || phrase.length > 120 || !link.startsWith(ADMIN_PAGE)) return null
+  const subject = `Pulse Play access for ${phrase}`
+  const text = [
+    'Hello,',
+    '',
+    `You have been invited to Pulse Play (${phrase}).`,
+    'Open this link to sign in. It opens the Pulse Play dashboard for that access only.',
+    '',
+    link,
+    '',
+    'If this note was not meant for you, ignore it.',
+    '',
+    'Pulse Play',
+  ].join('\n')
+  return { subject, text }
+}
+
 export function authorizeBroadcast(input: {
   caller: Caller
   action: string
@@ -99,6 +126,9 @@ export function authorizeBroadcast(input: {
   const action = input.action
   if (action !== 'status' && action !== 'list' && action !== 'test' && action !== 'start' && action !== 'end') {
     return { ok: false, status: 400, error: 'Choose a broadcast action.' }
+  }
+  if (!input.caller.admin && input.caller.scopes) {
+    return authorizeScoped(input.caller, action, input.requestedId, input.rows)
   }
   if (!input.caller.admin) {
     if (!input.caller.active || input.caller.divisions.length === 0) {
@@ -132,6 +162,39 @@ export function authorizeBroadcast(input: {
   return videoOf(rows[0], rows)
 }
 
+function authorizeScoped(
+  caller: { active: boolean; scopes: AccessGrant[] },
+  action: string,
+  requestedId: string,
+  rows: StreamRow[],
+): { ok: true; videoId: string } | { ok: false; status: number; error: string } {
+  const active = caller.scopes.filter((grant) => grant.status === 'active')
+  if (!caller.active || active.length === 0) {
+    return { ok: false, status: 403, error: 'This access grant is no longer active.' }
+  }
+  const staff = active.some((grant) => grant.role === 'admin')
+  if (action === 'test') {
+    return { ok: false, status: 403, error: 'Only a full Pulse Play admin can test the YouTube connection.' }
+  }
+  if (!staff && action !== 'start' && action !== 'end') {
+    return { ok: false, status: 403, error: 'Operators start and end their own division. An admin manages the YouTube connection.' }
+  }
+  if (action !== 'start' && action !== 'end') return { ok: true, videoId: '' }
+
+  const requested = requestedId.trim()
+  if (!REQUEST_ID.test(requested)) return { ok: false, status: 400, error: 'Choose a broadcast.' }
+  const matched = rows.filter((row) => row.id === requested || row.videoId === requested)
+  if (matched.length === 0 || matched.some((row) => !active.some((grant) => grantCoversStream(grant, row)))) {
+    return { ok: false, status: 403, error: 'That stream is outside your access.' }
+  }
+  return videoOf(matched[0], matched)
+}
+
+export function seesYoutubeConnection(caller: Caller): boolean {
+  if (caller.admin) return true
+  return (caller.scopes ?? []).some((grant) => grant.status === 'active' && grant.role === 'admin')
+}
+
 function videoOf(
   first: StreamRow,
   rows: StreamRow[],
@@ -152,7 +215,9 @@ export type PpAdminRecord = {
 export type PulsePlayDecision =
   | { kind: 'admin' }
   | { kind: 'operator'; divisions: string[] }
+  | { kind: 'scoped'; grants: AccessGrant[] }
   | { kind: 'pending' }
+  | { kind: 'invited' }
   | { kind: 'none' }
 
 export function classifyPulsePlayCaller(input: {
@@ -163,17 +228,23 @@ export function classifyPulsePlayCaller(input: {
   emailConfirmedAt: string | null | undefined
   admins: PpAdminRecord[]
   operator: { active: boolean; divisions: string[] } | null
+  grants?: AccessGrant[]
 }): PulsePlayDecision {
   const email = (input.email ?? '').trim().toLowerCase()
   const verified = Boolean(input.emailConfirmedAt) && Boolean(email)
+  const grants = input.grants ?? []
   const ppAdmin = input.admins.some((row) => {
     if (!row.active) return false
     if (row.userId && row.userId === input.userId) return true
     return verified && row.email.trim().toLowerCase() === email
   })
-  if ((input.profileRole === 'admin' && input.accessStatus !== 'pending') || ppAdmin) return { kind: 'admin' }
+  const fullGrant = grants.some(isFullAdminGrant)
+  if ((input.profileRole === 'admin' && input.accessStatus !== 'pending') || ppAdmin || fullGrant) return { kind: 'admin' }
   if (input.profileRole === 'admin' && input.accessStatus === 'pending') return { kind: 'pending' }
+  const scoped = grants.filter((grant) => grant.status === 'active')
+  if (scoped.length) return { kind: 'scoped', grants: scoped }
   const divisions = input.operator && input.operator.active ? cleanDivisions(input.operator.divisions) : null
   if (divisions) return { kind: 'operator', divisions }
+  if (grants.some((grant) => grant.status === 'pending')) return { kind: 'invited' }
   return { kind: 'none' }
 }
