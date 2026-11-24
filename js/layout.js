@@ -8,8 +8,21 @@
  * the CricketCrazeUSA logo's right inset. Positive x moves right. Positive
  * y moves down. Ground rows store only those nudges and a scale, so this
  * anchor is what places the tournament logo on every ground.
+ *
+ * The score bar's right edge is the anchor. It sits SCORE_GAP pixels left of
+ * the default CricketCrazeUSA box, and the same left and width are used for
+ * the subscribe ticker. If that logo is nudged or scaled so its painted left
+ * edge is further left, the bar yields to keep the gap. Scale grows the bar
+ * to the left. Past SCORE_MIN_LEFT the width stops so the bar stays on the
+ * 1920px stage, and the right edge keeps its gap. Height still follows the
+ * requested scale. A positive score x moves that right edge right; a positive
+ * y moves the bar down.
  */
 (function (global) {
+  var STAGE_W = 1920;
+  var STAGE_H = 1080;
+  var SCORE_GAP = 64;
+  var SCORE_MIN_LEFT = 16;
   var BASE = {
     pro: {
       age: { left: 40, top: 20, w: 168, h: 84 },
@@ -21,7 +34,9 @@
       age: { left: 36, top: 18, w: 224, h: 112 },
       tournament: { right: 28, top: 18, w: 211, h: 164 },
       cricketcraze: { right: 28, bottom: 13, w: 220, h: 169 },
-      score: { bottom: 20, w: 1734, h: 372 }
+      /* Widest bar that keeps SCORE_GAP before the Mini logo and
+         SCORE_MIN_LEFT on the stage. The old 1734px bar overlapped it. */
+      score: { bottom: 20, w: 1592, h: 372 }
     }
   };
   var SLOTS = ["age", "tournament", "cricketcraze", "score"];
@@ -112,18 +127,68 @@
     }
   }
 
-  function placeScore(el, base, slot) {
+  function logoLeft(base) {
+    return STAGE_W - base.right - base.w;
+  }
+
+  function paintedLogoLeft(el, base) {
+    var inset;
+    var width;
+    var edge;
+    var painted;
+    edge = logoLeft(base);
+    if (!el || !el.style) return edge;
+    inset = parseFloat(el.style.right);
+    width = parseFloat(el.style.width);
+    if (isNaN(inset) || isNaN(width)) return edge;
+    painted = STAGE_W - inset - width;
+    if (painted < edge) return painted;
+    return edge;
+  }
+
+  function scoreRightEdge(logoBase, logoEl, nudgeX) {
+    return paintedLogoLeft(logoEl, logoBase) - SCORE_GAP + nudgeX;
+  }
+
+  function placeScore(el, base, slot, logoBase, logoEl) {
+    var rightEdge;
+    var maxW;
     var w;
     var h;
+    var left;
     if (!el) return;
+    rightEdge = scoreRightEdge(logoBase, logoEl, slot.x);
+    maxW = rightEdge - SCORE_MIN_LEFT;
+    if (maxW < 1) maxW = 1;
     w = Math.round(base.w * slot.scale);
+    if (w > maxW) w = maxW;
+    if (w < 1) w = 1;
     h = Math.round(base.h * slot.scale);
+    if (h < 1) h = 1;
+    left = rightEdge - w;
+    if (left < SCORE_MIN_LEFT) left = SCORE_MIN_LEFT;
     clearBox(el);
     el.style.width = w + "px";
     el.style.height = h + "px";
-    el.style.left = "50%";
-    el.style.marginLeft = Math.round(-w / 2 + slot.x) + "px";
+    el.style.left = left + "px";
     el.style.bottom = (base.bottom - slot.y) + "px";
+  }
+
+  function alignTicker(scoreEl, tickerEl) {
+    if (!scoreEl || !tickerEl) return;
+    tickerEl.style.left = scoreEl.style.left;
+    tickerEl.style.width = scoreEl.style.width;
+    tickerEl.style.right = "auto";
+    tickerEl.style.marginLeft = "0";
+  }
+
+  /* Sit just above the painted score, and never above the stage. */
+  function tickerBottom(scoreBottom, scoreHeight, sy, tickerHeight) {
+    var next = Math.round(scoreBottom + scoreHeight * (sy || 1) + 10);
+    var limit = STAGE_H - (tickerHeight > 0 ? tickerHeight : 0);
+    if (next > limit) next = limit;
+    if (next < 0) next = 0;
+    return next;
   }
 
   function place(opts) {
@@ -134,15 +199,22 @@
     placeLogo(opts.age, base.age, layout.age, scales.age, "top");
     placeLogo(opts.tournament, base.tournament, layout.tournament, scales.tournament, "top-right");
     placeLogo(opts.cricketcraze, base.cricketcraze, layout.cricketcraze, scales.cricketcraze, "bottom-right");
-    placeScore(opts.score, base.score, layout.score);
+    placeScore(opts.score, base.score, layout.score, base.cricketcraze, opts.cricketcraze);
+    alignTicker(opts.score, opts.ticker);
   }
 
   global.PulsePlayLayout = {
     slots: SLOTS,
+    stageWidth: STAGE_W,
+    stageHeight: STAGE_H,
+    scoreGap: SCORE_GAP,
+    scoreMinLeft: SCORE_MIN_LEFT,
     normalize: normalize,
     defaults: defaults,
     isDefault: isDefault,
     logoMultiplier: logoMultiplier,
+    alignTicker: alignTicker,
+    tickerBottom: tickerBottom,
     place: place
   };
 })(window);

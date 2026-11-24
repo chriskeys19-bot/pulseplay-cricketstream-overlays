@@ -12,7 +12,7 @@ The unit is a **ground**, not a stream. Each ground has one short link. That lin
 
 Two views stay in the DOM the whole time:
 
-1. **View 1, Logos + Score.** PNG logos in fixed corners, and the CricClubs match overlay for that ground in the bottom center.
+1. **View 1, Logos + Score.** PNG logos in fixed corners, and the CricClubs match overlay for that ground along the bottom, left of the CricketCrazeUSA logo.
 2. **View 2, Ad.** Logos and the score overlay fade out. The selected MP4 plays, with audio left on. Logos + Score brings View 1 back. By default the video also returns to View 1 when it ends.
 
 ```mermaid
@@ -112,7 +112,7 @@ When a video ends, the renderer switches to Logos + Score and saves `mode: logos
 | Top left | Age group sponsor logo |
 | Top right | Tournament logo |
 | Bottom right | CricketCrazeUSA logo |
-| Bottom center | Iframe of that ground's `score_url` |
+| Bottom, left of CricketCrazeUSA | Iframe of that ground's `score_url` |
 
 Placeholder art is in the Logo Library (`assets/logos/`, including one SVG). Ground setup does not take a raw URL. Each corner is a picker: matching `logo_type` first, then any other logo. The shared CricketCrazeUSA asset is `logo-cricketcraze`. Uploads may be PNG, WebP, SVG, or JPG. JPG has no transparency, so it sits in a solid box on the stream. A PDF is not stored: the admin converts page 1 to a PNG (about 1000px on the long edge, transparent canvas) and uploads that.
 
@@ -149,7 +149,7 @@ This repo therefore uses an explicit stage and scales that stage to the viewport
 | Device | Stage | Why |
 | --- | --- | --- |
 | Pro | 1920×1080 | Full-HD program. Set the overlay widget to 1920×1080. |
-| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. The age-group logo box is 168×84 on Pro and 224×112 on Mini, set higher on the stage. Ground setup can scale each corner and the score from 25% to 200% and nudge them. Those multipliers sit on top of the device base, and a logo can carry its own scale for a padded file. Null layout is the size below. The tournament logo is 180×140 on Pro and 211×164 on Mini, in the top-right, sharing the age-group logo's top inset and the CricketCrazeUSA logo's right inset. CricketCrazeUSA stays 190px on Pro and 220px on Mini in the bottom-right. The score iframe is scaled 2.15× from its bottom center and sits about 20px lower so the painted bug stays on screen. |
+| Mini | 1920×1080 | Same program size as Pro. `mini.css` only enlarges logos, the score bug, and type so they read on the Mini's 5.5-inch panel. The age-group logo box is 168×84 on Pro and 224×112 on Mini, set higher on the stage. Ground setup can scale each corner and the score from 25% to 200% and nudge them. Those multipliers sit on top of the device base, and a logo can carry its own scale for a padded file. Null layout is the size below. The tournament logo is 180×140 on Pro and 211×164 on Mini, in the top-right, sharing the age-group logo's top inset and the CricketCrazeUSA logo's right inset. CricketCrazeUSA stays 190px on Pro and 220px on Mini in the bottom-right. The score bar is anchored by its right edge, 64px clear of that logo: Pro's default box is 1560×297 at left 66px (right edge 1626px), and Mini's is 1592×372 at left 16px (right edge 1608px). Scale widens the bar to the left and stops at 16px from the frame so a 1.16 or 1.25 ground still clears the logo. Positive X moves the bar right and positive Y moves it down. The subscribe ticker uses the score bar's left edge and width. The score iframe is scaled 2.15× from its bottom center and sits about 20px lower so the painted bug stays on screen. |
 
 Percentage-free pixel placement inside the stage keeps the corners stable. `renderer/overlay.js` scales the stage with `transform` so a widget that is not exactly that size letterboxes instead of cropping.
 

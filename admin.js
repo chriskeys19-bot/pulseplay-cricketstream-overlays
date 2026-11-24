@@ -1248,7 +1248,7 @@
     age: "Top left · Age group",
     tournament: "Top right · Tournament",
     cricketcraze: "Bottom right · CricketCrazeUSA",
-    score: "Bottom center · Score"
+    score: "Bottom · Score"
   };
 
   function layoutField(id, type, min, max, step, value) {
@@ -1421,7 +1421,8 @@
       age: document.getElementById("layout-age"),
       tournament: document.getElementById("layout-tournament"),
       cricketcraze: document.getElementById("layout-ccusa"),
-      score: document.getElementById("layout-score")
+      score: document.getElementById("layout-score"),
+      ticker: document.getElementById("layout-ticker")
     });
     setLayoutLogo("layout-age", age);
     setLayoutLogo("layout-tournament", tournament);
@@ -1463,12 +1464,15 @@
     var next;
     var message;
     if (!score || !bar) return;
+    if (window.PulsePlayLayout && window.PulsePlayLayout.alignTicker) {
+      window.PulsePlayLayout.alignTicker(score, bar);
+    }
     bottom = parseFloat(score.style.bottom);
     height = parseFloat(score.style.height);
     sy = parseFloat(score.style.getPropertyValue("--score-sy"));
     if (!sy) sy = 1;
     if (isNaN(bottom) || isNaN(height)) return;
-    next = Math.round(bottom + height * sy + 10) + "px";
+    next = window.PulsePlayLayout.tickerBottom(bottom, height, sy, bar.offsetHeight || 48) + "px";
     if (bar.style.bottom !== next) bar.style.bottom = next;
     message = currentDoc && currentDoc.ticker_messages && currentDoc.ticker_messages[0]
       ? currentDoc.ticker_messages[0]

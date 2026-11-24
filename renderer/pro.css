@@ -4,11 +4,15 @@
 .logo-tournament { position: absolute; right: 40px; top: 20px; width: 180px; }
 .logo-ccusa { position: absolute; right: 40px; bottom: 20px; width: 190px; }
 #score-slot {
-  left: 50%;
+  left: 66px;
   bottom: 28px;
   width: 1560px;
   height: 297px;
-  margin-left: -780px;
+}
+#subscribe-ticker {
+  left: 66px;
+  right: auto;
+  width: 1560px;
 }
 #score-fallback { font-size: 28px; line-height: 297px; }
 #overlay-status span { font-size: 32px; }
