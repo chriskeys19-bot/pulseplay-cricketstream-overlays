@@ -85,6 +85,13 @@
     return window.PulsePlayAccess && window.PulsePlayAccess.role === "operator";
   }
 
+  function visibleRows(list) {
+    if (!window.PulsePlayScope) return list || [];
+    return (list || []).filter(function (row) {
+      return window.PulsePlayScope.streamVisible(window.PulsePlayAccess, row);
+    });
+  }
+
   function lockMute(player) {
     if (!player) return;
     try { if (player.mute) player.mute(); } catch (e) {}
@@ -527,7 +534,7 @@
         arm();
         return;
       }
-      rows = result.rows;
+      rows = visibleRows(result.rows);
       if (rules.signature(rows, lifeById) !== lastSignature) {
         render();
         publishRows();
@@ -597,7 +604,7 @@
       changes.push(change);
     }
     if (refetch) { fetchRows(); return; }
-    rows = rules.applyChanges(rows, rules.coalesceChanges(changes));
+    rows = visibleRows(rules.applyChanges(rows, rules.coalesceChanges(changes)));
     render();
     if (window.PulsePlayTabs && window.PulsePlayTabs.isLeader()) publishRows();
   }
@@ -743,7 +750,7 @@
         if (!msg || msg.type !== "streams" || sampleMode || !running) return;
         if (window.PulsePlayTabs.isLeader()) return;
         if (msg.signature && msg.signature === lastSignature) return;
-        rows = msg.rows || [];
+        rows = visibleRows(msg.rows || []);
         lifeById = msg.lives || {};
         lastSignature = msg.signature || rules.signature(rows, lifeById);
         render();

@@ -45,16 +45,21 @@
 
   function readError(error) {
     var context = error && error.context;
+    var fallback = window.PulsePlayScope
+      ? window.PulsePlayScope.explainFunctionError(error && error.message, "YouTube could not complete that request.")
+      : "YouTube could not complete that request.";
     if (context && context.json) {
       return context.json().then(function (body) {
-        var message = body && body.error ? body.error : "YouTube could not complete that request.";
+        var message = body && body.error ? body.error : fallback;
         return { message: message, body: body };
       }).catch(function () {
-        return { message: "YouTube could not complete that request.", body: null };
+        return { message: fallback, body: null };
       });
     }
     return Promise.resolve({
-      message: error && error.message ? error.message : "YouTube could not complete that request.",
+      message: error && error.message
+        ? (window.PulsePlayScope ? window.PulsePlayScope.explainFunctionError(error.message, fallback) : error.message)
+        : fallback,
       body: null
     });
   }
@@ -100,7 +105,11 @@
     }
     setText(label, text);
     if (connect) {
-      connect.disabled = false;
+      var fullAdmin = !window.PulsePlayAccess || window.PulsePlayAccess.fullAdmin !== false;
+      var test = document.getElementById("broadcast-test");
+      connect.classList.toggle("is-off", !fullAdmin);
+      if (test) test.classList.toggle("is-off", !fullAdmin);
+      connect.disabled = !fullAdmin;
       setText(connect, connection && connection.connected ? "Reconnect YouTube" : "Connect YouTube");
     }
   }

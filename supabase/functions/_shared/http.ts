@@ -30,6 +30,9 @@ export function redactForLog(value: string): string {
 }
 
 export function json(req: Request, status: number, body: unknown): Response {
+  if (status === 204 || status === 205 || status === 304) {
+    throw new Error(`json() cannot build status ${status}: that status cannot have a body. Use preflight() for OPTIONS.`)
+  }
   let text = JSON.stringify(body)
   if (SECRET_FIELD.test(text)) {
     console.error('refusing a YouTube response that included a token field')

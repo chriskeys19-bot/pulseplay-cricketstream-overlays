@@ -368,14 +368,33 @@
     return node;
   }
 
+  function isFullAdmin() {
+    var access = window.PulsePlayAccess;
+    return !access || access.fullAdmin !== false;
+  }
+
+  function scopedGrounds() {
+    var grounds = currentDoc && currentDoc.grounds ? currentDoc.grounds : [];
+    var access = window.PulsePlayAccess;
+    var streams = window.PulsePlayAccessStreams || [];
+    var out = [];
+    var i;
+    if (!window.PulsePlayScope || !access || access.fullAdmin) return grounds;
+    for (i = 0; i < grounds.length; i++) {
+      if (window.PulsePlayScope.groundVisible(access, grounds[i], streams)) out.push(grounds[i]);
+    }
+    return out;
+  }
+
   function fillGroundSelect(select, includeNew) {
     var previous = select.value;
+    var grounds = scopedGrounds();
     var i;
     var ground;
     clear(select);
-    if (includeNew) select.appendChild(option("__new__", "+ New ground"));
-    for (i = 0; i < currentDoc.grounds.length; i++) {
-      ground = currentDoc.grounds[i];
+    if (includeNew && isFullAdmin()) select.appendChild(option("__new__", "+ New ground"));
+    for (i = 0; i < grounds.length; i++) {
+      ground = grounds[i];
       select.appendChild(option(ground.id, window.PulsePlayDevice.groundOptionLabel(ground.name)));
     }
     if (previous && select.querySelector) {
@@ -1031,6 +1050,7 @@
 
   function renderCenter() {
     var grid = document.getElementById("card-grid");
+    var grounds = scopedGrounds();
     var sig = groundIds().join("|") || "__empty__";
     var i;
     var card;
@@ -1039,20 +1059,22 @@
     if (sig !== centerSig) {
       centerSig = sig;
       clear(grid);
-      if (!currentDoc.grounds.length) {
+      if (!grounds.length) {
         emptyNote = document.createElement("p");
         emptyNote.className = "hint";
-        setText(emptyNote, "No grounds yet. Add the first one in Ground setup. Overlay pages stay transparent until a ground exists.");
+        setText(emptyNote, currentDoc.grounds.length
+          ? "No grounds in your access."
+          : "No grounds yet. Add the first one in Ground setup. Overlay pages stay transparent until a ground exists.");
         grid.appendChild(emptyNote);
         paintStuckHint();
         return;
       }
-      for (i = 0; i < currentDoc.grounds.length; i++) grid.appendChild(buildCard(currentDoc.grounds[i]));
+      for (i = 0; i < grounds.length; i++) grid.appendChild(buildCard(grounds[i]));
       paintStuckHint();
       return;
     }
-    for (i = 0; i < currentDoc.grounds.length; i++) {
-      ground = currentDoc.grounds[i];
+    for (i = 0; i < grounds.length; i++) {
+      ground = grounds[i];
       card = null;
       var cards = grid.getElementsByClassName("card");
       var n;
@@ -1066,8 +1088,9 @@
 
   function groundIds() {
     var ids = [];
+    var grounds = scopedGrounds();
     var i;
-    for (i = 0; i < currentDoc.grounds.length; i++) ids.push(currentDoc.grounds[i].id);
+    for (i = 0; i < grounds.length; i++) ids.push(grounds[i].id);
     return ids;
   }
 
@@ -1689,8 +1712,14 @@
 
   function showTab(name) {
     var setupPanels = ["controls", "center", "library", "logos", "setup", "ticker"];
+    var flags = window.PulsePlayAccess;
     var main;
+    var globalPanels = { library: 1, logos: 1, ticker: 1 };
     if (accessRole === "operator" && name !== "streams" && name !== "wall") name = "streams";
+    if (flags && !flags.setup && (name === "setup" || name === "setup-home" || setupPanels.indexOf(name) !== -1)) name = "streams";
+    if (flags && !flags.broadcasts && name === "broadcasts") name = "streams";
+    if (flags && !flags.manage && name === "access") name = "streams";
+    if (flags && !flags.fullAdmin && globalPanels[name]) name = flags.setup ? "controls" : "streams";
     main = name === "streams" || name === "broadcasts" || name === "access" || name === "wall" ? name : "setup";
     var section = main === "setup" ? (name === "setup-home" ? setupSection : name) : "";
     var i;
@@ -1772,8 +1801,12 @@
     if (sig !== controlsSig) {
       controlsSig = sig;
       fillGroundSelect(select, false);
-      if (!(currentId && findGround(currentDoc, currentId)) && currentDoc.grounds[0]) {
-        currentId = currentDoc.grounds[0].id;
+      var visible = scopedGrounds();
+      var visibleIds = [];
+      var n;
+      for (n = 0; n < visible.length; n++) visibleIds.push(visible[n].id);
+      if (!(currentId && indexOf(visibleIds, currentId) !== -1) && visible[0]) {
+        currentId = visible[0].id;
       }
       if (currentId) select.value = currentId;
       actionSig = "";
@@ -1789,6 +1822,10 @@
   }
 
   function saveDoc(hint) {
+    if (!isFullAdmin()) {
+      showBanner("That change is for a full Pulse Play admin.");
+      return;
+    }
     store.write(currentDoc, function (err) {
       if (err) {
         showBanner(err.message || "Could not save.");
@@ -1805,12 +1842,27 @@
   function patch(id, fields, opts) {
     var ground = findGround(currentDoc, id);
     var key;
+    var hint;
     if (!ground) return;
     for (key in fields) {
       if (fields.hasOwnProperty(key)) ground[key] = fields[key];
     }
     if (!opts || !opts.keepUpdatedAt) ground.updated_at = new Date().toISOString();
-    saveDoc("Saved " + ground.name + " at " + formatTime(ground.updated_at) + ". The overlay follows within about 2 seconds, often sooner in this browser.");
+    hint = "Saved " + ground.name + " at " + formatTime(ground.updated_at) + ". The overlay follows within about 2 seconds, often sooner in this browser.";
+    if (!isFullAdmin() && store.writeGround) {
+      store.writeGround(ground, { live: true }, function (err) {
+        if (err) {
+          showBanner(err.message || "Could not save.");
+          return;
+        }
+        showBanner("");
+        actionSig = "";
+        setText(document.getElementById("save-hint"), hint);
+        renderAll();
+      });
+      return;
+    }
+    saveDoc(hint);
   }
 
   function tickerMessagesFromDoc() {
@@ -1905,6 +1957,27 @@
       hit = true;
     }
     if (!hit) return;
+    if (!isFullAdmin() && store.writeGround) {
+      if (!groundIds) {
+        showBanner("Showing the ticker on every ground is for a full Pulse Play admin.");
+        return;
+      }
+      (function writeNext(index) {
+        var target;
+        if (index >= groundIds.length) {
+          showBanner("");
+          setText(document.getElementById("save-hint"), "Subscribe ticker will scroll once on this ground.");
+          return;
+        }
+        target = findGround(currentDoc, groundIds[index]);
+        if (!target) { writeNext(index + 1); return; }
+        store.writeGround(target, { live: true }, function (err) {
+          if (err) { showBanner(err.message || "Could not save."); return; }
+          writeNext(index + 1);
+        });
+      })(0);
+      return;
+    }
     saveDoc(groundIds ? "Subscribe ticker will scroll once on this ground." : "Subscribe ticker will scroll once on every ground.");
   }
 
@@ -2620,35 +2693,48 @@
   var dashboardStarted = false;
   var accessRole = "admin";
 
-  function applyAccess(role, divisions) {
-    var operator = role === "operator";
-    var hidden = ["tab-setup-home", "tab-broadcasts", "tab-access"];
-    var i;
-    var node;
-    accessRole = operator ? "operator" : "admin";
-    window.PulsePlayAccess = { role: accessRole, divisions: divisions || [] };
-    for (i = 0; i < hidden.length; i++) {
-      node = document.getElementById(hidden[i]);
-      if (node) node.classList.toggle("is-off", operator);
-    }
-    if (operator) showTab("streams");
+  function hideNode(id, hidden) {
+    var node = document.getElementById(id);
+    if (node) node.classList.toggle("is-off", !!hidden);
   }
 
-  function enterDashboard(role, divisions) {
+  function applyAccess(summary) {
+    var operatorOnly;
+    window.PulsePlayAccess = summary;
+    operatorOnly = !summary.setup && !summary.broadcasts && !summary.manage;
+    accessRole = operatorOnly ? "operator" : "admin";
+    hideNode("tab-setup-home", !summary.setup);
+    hideNode("tab-broadcasts", !summary.broadcasts);
+    hideNode("tab-access", !summary.manage);
+    hideNode("tab-library", !summary.fullAdmin);
+    hideNode("tab-logos", !summary.fullAdmin);
+    hideNode("tab-ticker", !summary.fullAdmin);
+    hideNode("btn-delete-ground", !summary.fullAdmin);
+    hideNode("btn-ticker-all", !summary.fullAdmin);
+    var poll = document.getElementById("poll-seconds");
+    var picks = document.getElementById("poll-picks");
+    if (poll) poll.disabled = !summary.fullAdmin;
+    if (picks) picks.classList.toggle("is-off", !summary.fullAdmin);
+    if (operatorOnly) showTab("streams");
+  }
+
+  function enterDashboard(summary) {
     var intro = document.getElementById("streams-intro");
-    applyAccess(role, divisions);
+    applyAccess(summary);
     showSignError("");
     hideSignIn();
     if (intro) {
-      setText(intro, role === "operator"
-        ? "Your division only. Start and End use the club YouTube connection. Setup and other divisions stay with an admin."
-        : "Today and upcoming CricketCrazeUSA games. Start and End use the same YouTube connection as Broadcasts.");
+      setText(intro, summary.fullAdmin
+        ? "Today and upcoming CricketCrazeUSA games. Start and End use the same YouTube connection as Broadcasts."
+        : summary.setup
+          ? "Your tournament only. Grounds, the live wall, and broadcasts outside it stay hidden."
+          : "Your games only. Start and End stay inside your access. Setup stays with an admin.");
     }
     if (!dashboardStarted) {
       dashboardStarted = true;
       boot();
     }
-    maybeOpenBroadcasts();
+    if (summary.broadcasts) maybeOpenBroadcasts();
     if (window.PulsePlayStreams && !document.getElementById("panel-streams").classList.contains("is-off")) {
       window.PulsePlayStreams.show();
     }
@@ -2684,32 +2770,61 @@
           return;
         }
         if (role === "admin") {
-          enterDashboard("admin", []);
+          enterDashboard(window.PulsePlayScope.legacyAdmin());
           return;
         }
-        if (!authClient) {
-          showNotAdmin(email);
+        loadAccess(email);
+      });
+    });
+  }
+
+  function loadAccess(email) {
+    function legacy() {
+      if (!authClient) {
+        showNotAdmin(email);
+        return;
+      }
+      authClient.from("pp_admins").select("id").eq("active", true).limit(1).then(function (adminResult) {
+        if (!adminResult.error && adminResult.data && adminResult.data.length) {
+          enterDashboard(window.PulsePlayScope.legacyAdmin());
           return;
         }
-        authClient.from("pp_admins").select("id").eq("active", true).limit(1).then(function (adminResult) {
-          if (!adminResult.error && adminResult.data && adminResult.data.length) {
-            enterDashboard("admin", []);
+        authClient.from("pp_operators").select("divisions, active").eq("active", true).then(function (result) {
+          var row = result.data && result.data[0];
+          if (result.error || !row || !row.divisions || !row.divisions.length) {
+            showNotAdmin(email);
             return;
           }
-          authClient.from("pp_operators").select("divisions, active").eq("active", true).then(function (result) {
-            var row = result.data && result.data[0];
-            if (result.error || !row || !row.divisions || !row.divisions.length) {
-              showNotAdmin(email);
-              return;
-            }
-            enterDashboard("operator", row.divisions);
-          }).catch(function () {
-            showNotAdmin(email);
-          });
+          enterDashboard(window.PulsePlayScope.legacyOperator(row.divisions));
         }).catch(function () {
           showNotAdmin(email);
         });
+      }).catch(function () {
+        showNotAdmin(email);
       });
+    }
+    if (!authClient || !authClient.functions || !window.PulsePlayScope) {
+      legacy();
+      return;
+    }
+    authClient.functions.invoke("pp-access", { body: { action: "me" } }).then(function (result) {
+      var summary;
+      if (result.error || !result.data || result.data.error) {
+        legacy();
+        return;
+      }
+      window.PulsePlayCatalog = {
+        tournaments: result.data.tournaments || [],
+        ageGroups: result.data.ageGroups || []
+      };
+      summary = window.PulsePlayScope.summaryFromMe(result.data);
+      if (!summary.allowed) {
+        showNotAdmin(email);
+        return;
+      }
+      enterDashboard(summary);
+    }).catch(function () {
+      legacy();
     });
   }
 
@@ -2805,6 +2920,13 @@
   }
   window.PulsePlayAdmin = {
     openGround: openGround,
-    grounds: function () { return currentDoc && currentDoc.grounds ? currentDoc.grounds : []; }
+    grounds: function () { return scopedGrounds(); },
+    noteStreams: function (rows) {
+      window.PulsePlayAccessStreams = rows || [];
+      centerSig = "";
+      controlsSig = "";
+      setupSig = null;
+      if (currentDoc) renderAll();
+    }
   };
 })();

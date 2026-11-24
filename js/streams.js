@@ -33,12 +33,15 @@
 
   function readError(error) {
     var context = error && error.context;
+    var fallback = window.PulsePlayScope
+      ? window.PulsePlayScope.explainFunctionError(error && error.message, "YouTube could not complete that request.")
+      : (error && error.message ? error.message : "YouTube could not complete that request.");
     if (context && context.json) {
       return context.json().then(function (body) {
-        return body && body.error ? body.error : "YouTube could not complete that request.";
-      }).catch(function () { return "YouTube could not complete that request."; });
+        return body && body.error ? body.error : fallback;
+      }).catch(function () { return fallback; });
     }
-    return Promise.resolve(error && error.message ? error.message : "YouTube could not complete that request.");
+    return Promise.resolve(fallback);
   }
 
   function invoke(body) {
@@ -471,6 +474,12 @@
         return;
       }
       streams = result.data || [];
+      if (window.PulsePlayScope) {
+        streams = streams.filter(function (row) {
+          return window.PulsePlayScope.streamVisible(window.PulsePlayAccess, row);
+        });
+      }
+      if (window.PulsePlayAdmin && window.PulsePlayAdmin.noteStreams) window.PulsePlayAdmin.noteStreams(streams);
       fillFilters();
       if (isOperator()) {
         connected = true;
