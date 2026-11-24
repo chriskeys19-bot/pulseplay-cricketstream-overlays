@@ -133,6 +133,8 @@
       if (callback) callback(null);
     }
 
+    // Club role only. Pulse Play-only admins are checked against pp_admins
+    // in the dashboard and are not given a Cheetahs profiles.role of admin.
     function fetchRole(callback) {
       getSession(function (session) {
         if (!session || !session.user_id) {

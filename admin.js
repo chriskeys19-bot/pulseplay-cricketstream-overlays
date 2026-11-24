@@ -2679,13 +2679,21 @@
           showNotAdmin(email);
           return;
         }
-        authClient.from("pp_operators").select("divisions, active").eq("active", true).then(function (result) {
-          var row = result.data && result.data[0];
-          if (result.error || !row || !row.divisions || !row.divisions.length) {
-            showNotAdmin(email);
+        authClient.from("pp_admins").select("id").eq("active", true).limit(1).then(function (adminResult) {
+          if (!adminResult.error && adminResult.data && adminResult.data.length) {
+            enterDashboard("admin", []);
             return;
           }
-          enterDashboard("operator", row.divisions);
+          authClient.from("pp_operators").select("divisions, active").eq("active", true).then(function (result) {
+            var row = result.data && result.data[0];
+            if (result.error || !row || !row.divisions || !row.divisions.length) {
+              showNotAdmin(email);
+              return;
+            }
+            enterDashboard("operator", row.divisions);
+          }).catch(function () {
+            showNotAdmin(email);
+          });
         }).catch(function () {
           showNotAdmin(email);
         });
