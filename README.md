@@ -1,6 +1,6 @@
 # Pulse Play YoloBox overlays
 
-Remote control for the overlay pages that YoloBox Pro and YoloBox Mini load in their built-in browsers during Pulse Play broadcasts of Cheetahs Cricket Club games on the CricketCrazeUSA YouTube channel.
+Remote control for the overlay pages that YoloBox Pro and YoloBox Ultra load in their built-in browsers during Pulse Play broadcasts of Cheetahs Cricket Club games on the CricketCrazeUSA YouTube channel. Both use `renderer/pro.html` with `device=pro`. `renderer/mini.html` redirects there.
 
 Vanilla HTML, CSS, and JavaScript. No build step. This slice does not create a Supabase project and does not contain credentials.
 
@@ -22,7 +22,6 @@ flowchart LR
   mock[Mock: JSON plus localStorage and IndexedDB]
   future[Supabase table, Storage, Realtime]
   pro[Pro renderer 1920x1080]
-  mini[Mini renderer 1920x1080]
   shortLink[One short link per ground]
   pages[GitHub Pages]
 
@@ -30,10 +29,8 @@ flowchart LR
   adapter --> mock
   adapter -.-> future
   pro -->|poll about 2s and subscribe| adapter
-  mini -->|poll about 2s and subscribe| adapter
   shortLink --> pages
   pages --> pro
-  pages --> mini
 ```
 
 ```mermaid
@@ -101,7 +98,7 @@ A video ad is a plain `<video>`: no `muted` attribute, `autoplay`, `playsinline`
 
 The YoloBox Audio Mixer WEB channel still has to be ON with its fader up for any page audio to reach Program. The page no longer mutes the ad or retries playback to coax the WebView. If the commercial is still silent, the WebView is blocking autoplay audio and this page cannot force it. Put the MP4 on a native YoloBox video source, which carries its own audio, and keep this overlay for logos and the score.
 
-When a video ends, the renderer switches to Logos + Score and saves `mode: logos_score` and `active_ad: null`. That happens for every video, on every ground, on Pro and Mini. The old `auto_return_on_end` and per-ad `auto_return` flags are not consulted. An image stays on screen until someone switches. The save is one row update through `pulseplay_return_to_logos`. It matches the `updated_at` of the play that just finished, so a newer Ground controls command is not overwritten. A poll that still has the old play is ignored until that save, or a newer command, is read back. Ground controls and Command Center follow the saved mode.
+When a video ends, the renderer switches to Logos + Score and saves `mode: logos_score` and `active_ad: null`. That happens for every video, on every ground. The old `auto_return_on_end` and per-ad `auto_return` flags are not consulted. An image stays on screen until someone switches. The save is one row update through `pulseplay_return_to_logos`. It matches the `updated_at` of the play that just finished, so a newer Ground controls command is not overwritten. A poll that still has the old play is ignored until that save, or a newer command, is read back. Ground controls and Command Center follow the saved mode.
 
 ### Views
 
@@ -134,7 +131,7 @@ Later, a small proxy or Supabase Edge Function can fetch the score server-side a
 
 **Logo Library** is the same pattern for images: name, description, type (Age Group Sponsor, Tournament, CricketCrazeUSA, or Other), preview, list, delete. PNG, WebP, SVG, and JPG are stored as uploaded. JPG shows a note that it has no transparency. A PDF is rendered with pdf.js (page 1) to a PNG preview, and that PNG is what gets saved.
 
-**Ground setup** edits or adds a ground: name, id, short URL, device (YoloBox Pro or YoloBox Mini), CricClubs overlay URL, the three logo pickers, and the ads this game may play. The control view's buttons are only Logos + Score plus that ground's assigned ads. Saving recomputes `resolved_url`. **Duplicate ground** copies the logos, layout, ad set, device, and the external-video switch into a new ground with a new id and name. It does not copy score URLs. Set a new score URL, then adjust the age-group logo and tournament logo. Each Command Center card has copyable renderer, SRT, and RTMP links. A score URL that is not `overlay.cricclubs.com` is flagged, because that is the only host allowlisted for embedding.
+**Ground setup** edits or adds a ground: name, id, short URL, device (YoloBox Pro / Ultra, stored as `pro`), CricClubs overlay URL, the three logo pickers, and the ads this game may play. The control view's buttons are only Logos + Score plus that ground's assigned ads. Saving recomputes `resolved_url`. **Duplicate ground** copies the logos, layout, ad set, device, and the external-video switch into a new ground with a new id and name. It does not copy score URLs. Set a new score URL, then adjust the age-group logo and tournament logo. Each Command Center card has copyable renderer, SRT, and RTMP links. A score URL that is not `overlay.cricclubs.com` is flagged, because that is the only host allowlisted for embedding.
 
 **Score overlay**, on Ground controls, stores several named CricClubs URLs for one ground (a morning game and an afternoon game). One tap makes a saved entry the live score, or paste a new name and URL and show it immediately. The overlay swaps the score iframe offscreen and leaves the logos where they are.
 
@@ -142,7 +139,7 @@ Later, a small proxy or Supabase Edge Function can fetch the score server-side a
 
 ### Canvas size
 
-Both encoders can go to 1080p (YoloLiv's Pro and Mini spec pages list 1080p among the live broadcast resolutions). The Mini's own panel is a 5.5-inch touchscreen. YoloBox's Web URL overlay does not scale a page to the widget by itself, and a page without an explicit size is often cropped. Operators should drag the Web URL widget to the full frame after pasting the short link.
+YoloBox Pro and YoloBox Ultra both broadcast at 1080p. YoloBox's Web URL overlay does not scale a page to the widget by itself, and a page without an explicit size is often cropped. Operators should drag the Web URL widget to the full frame after pasting the short link.
 
 This repo therefore uses an explicit stage and scales that stage to the viewport:
 
@@ -154,6 +151,8 @@ This repo therefore uses an explicit stage and scales that stage to the viewport
 Percentage-free pixel placement inside the stage keeps the corners stable. `renderer/overlay.js` scales the stage with `transform` so a widget that is not exactly that size letterboxes instead of cropping.
 
 Background is transparent so the game video shows through View 1. Confirm on a device that the browser honors CSS transparency. If it paints opaque white, we need whatever chroma or composite control the firmware offers.
+
+YoloBox Mini is retired. `renderer/mini.html` keeps the query string and hash, forces `device=pro`, and opens `renderer/pro.html`. Stale short links that still point at mini.html, including older short.io links, land on the Pro renderer. Ground setup only offers YoloBox Pro / Ultra and writes `device=pro`. `mini` remains a legal stored value so older rows still validate. The dashboard labels every ground YoloBox Pro / Ultra and builds overlay URLs with `pro.html` and `device=pro`. `js/layout.js` still has the old Mini base sizes. Nothing in the admin UI selects them.
 
 ## Config schema
 
@@ -168,7 +167,7 @@ Background is transparent so the game video shows through View 1. Confirm on a d
 | `name` | Label |
 | `short_link` | The one public URL for this ground |
 | `resolved_url` | Pages URL the short link targets |
-| `device` | `pro` or `mini` |
+| `device` | `pro` for YoloBox Pro and YoloBox Ultra. Older rows may still say `mini`. The dashboard does not write `ultra`. |
 | `mode` | `logos_score` or `ad` |
 | `active_ad` | Ad id, or `null` on View 1 |
 | `score_url` | CricClubs overlay URL. Renderer and Command Center both use it |
@@ -197,7 +196,7 @@ From the repo root the pages talk to Supabase, which starts empty. To exercise t
 
 - Admin: <http://localhost:8080/admin.html?adapter=mock>
 - Pro, Cheetahs home: <http://localhost:8080/renderer/pro.html?ground=cheetahs-home&device=pro&adapter=mock>
-- Mini, Cheetahs home: <http://localhost:8080/renderer/mini.html?ground=cheetahs-home-mini&device=mini&adapter=mock>
+- Retired Mini URL (redirects to Pro, keeps the query, forces `device=pro`): <http://localhost:8080/renderer/mini.html?ground=sycamore2&device=mini&adapter=mock>
 
 Open the admin and the Pro overlay in two tabs of the same browser. On Ground controls, choose Cheetahs CC — Home (Pro). It should offer Logos + Score, Ad 1, and Ad 2 only. Click **Ad 1**. The overlay crossfades to the video without reloading, and the score iframe keeps its address. **Logos + Score** fades back. Leave an ad playing and it should return to View 1 when the file ends.
 
@@ -224,7 +223,7 @@ Once the first deploy finishes:
 - <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/>
 - <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/admin.html>
 - <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/pro.html?ground=cheetahs-home&device=pro>
-- <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/mini.html?ground=cheetahs-home-mini&device=mini>
+- <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/mini.html?ground=sycamore2&device=mini> (redirects to `pro.html?ground=sycamore2&device=pro`)
 - <https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlays/renderer/audiotest.html>
 
 Pages publishes `main` only, so this pull request does not change a live overlay. The admin page sends `noindex`. It still only changes the visitor's own browser.
@@ -262,7 +261,7 @@ assets/ads/ad1.mp4 … ad4.mp4
 
 ## Assumptions
 
-- One config row per ground, and that row has one device. Home Pro and Home Mini are two grounds so each can have its own short link.
+- One config row per ground. YoloBox Pro and YoloBox Ultra both store `device=pro` and load `renderer/pro.html`. Older rows may still say `mini`; the page redirects and the dashboard still labels them YoloBox Pro / Ultra.
 - `game_live` from the first sketch is gone. The overlay is View 1 or View 2.
 - The YoloBox is pointed at the short link once. The short link already includes `?ground=` and `&device=`.
 - Placeholder scores that are not CricClubs exist so the bug is visible before real overlay URLs are pasted in. Featured grounds point at `https://cricclubs.com/` to show the fallback.

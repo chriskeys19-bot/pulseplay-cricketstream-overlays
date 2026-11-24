@@ -11,7 +11,7 @@ Command Center shows both, plus the renderer URL, with a Copy button on each gro
 
 In admin, turn on **External video ad stream (SRT)** for that ground. While a video ad is on air the overlay page goes fully transparent (logos, score, and the match URL are hidden) so the keyed stream shows through. When the ad's length plus about 2.5 seconds has passed, the page returns to Logos + Score by itself. Image ads still play in the page. Leave the switch off and the page plays the video itself, as it does today.
 
-Duplicate an existing ground when you are standing up the next field. That copies logos, layout, the ad set, the device, and the SRT switch into a new id and name. It does not copy score URLs. Set a new score URL, then change the age-group sponsor logo and the tournament logo if this game needs different ones. The score URL should be on `overlay.cricclubs.com`. Any other host is not allowlisted for embedding, and the form says so. Save ground writes only that ground. It leaves the on-air ad and the layout or SRT switch alone unless you changed them, or you unticked the ad that is on air. Score width, under Layout, narrows the bar from the center without shrinking the page the score is drawn on. That short bar is drawn at 2.15×. A `static.cricclubs.com` `ccindex.html` page is already full size, so the overlay leaves it at 1× and still uses the ground's score scale and nudge. When you save a score, tick **Full-size page** for a bar that is already drawn large, or leave it off for the compact overlay.cricclubs.com bar (including a short link that points there).
+Duplicate an existing ground when you are standing up the next field. That copies logos, layout, the ad set, and the SRT switch into a new id and name. The copy is saved as device `pro`. It does not copy score URLs. Set a new score URL, then change the age-group sponsor logo and the tournament logo if this game needs different ones. The score URL should be on `overlay.cricclubs.com`. Any other host is not allowlisted for embedding, and the form says so. Save ground writes only that ground. It leaves the on-air ad and the layout or SRT switch alone unless you changed them, or you unticked the ad that is on air. Score width, under Layout, narrows the bar from the center without shrinking the page the score is drawn on. That short bar is drawn at 2.15×. A `static.cricclubs.com` `ccindex.html` page is already full size, so the overlay leaves it at 1× and still uses the ground's score scale and nudge. When you save a score, tick **Full-size page** for a bar that is already drawn large, or leave it off for the compact overlay.cricclubs.com bar (including a short link that points there).
 
 The web overlay also draws a CricketCrazeUSA like-and-subscribe line just above the score. It scrolls on for about 20 seconds every 10 minutes, then hides, and it stays hidden during a video or image ad. Change the words, the gap, and the on-screen time under Subscribe ticker. Each ground can turn it off. Ground controls has **Show subscribe ticker now** for one pass on this ground, and **Show on all grounds** for every field at once. Neither button changes the logos, the ads, or the score.
 
@@ -27,6 +27,10 @@ A ground that hosts two games in a day keeps both score URLs. On Ground controls
 6. In the **Audio Mixer**, turn the SRT channel on.
 7. Turn the web overlay on and load this ground's renderer URL (`renderer/pro.html?ground=<ground id>&device=pro` on the Pages site, or the short link that points there).
 
-## YoloBox Mini
+## YoloBox Ultra
 
-Placeholder. Fill this in after the Mini keying and PIP steps are confirmed.
+YoloBox Ultra uses the same web overlay as YoloBox Pro. Follow the YoloBox Pro steps above and load `renderer/pro.html?ground=<ground id>&device=pro`.
+
+## Retired YoloBox Mini links
+
+YoloBox Mini units are no longer used. `renderer/mini.html` redirects to `renderer/pro.html`, keeps the query string and hash, and forces `device=pro`. A short link that still points at mini.html, including older short.io links, opens the Pro overlay. Ground setup does not offer a Mini device. The stored device stays `pro`.

@@ -145,7 +145,7 @@
           "type": "string",
           "minLength": 1,
           "pattern": "^[a-z0-9-]+$",
-          "description": "Stable id. The renderer URL is ?ground=<id>&device=pro|mini."
+          "description": "Stable id. The renderer URL is ?ground=<id>&device=pro."
         },
         "name": { "type": "string", "minLength": 1 },
         "short_link": {
@@ -161,7 +161,7 @@
         "device": {
           "type": "string",
           "enum": ["pro", "mini"],
-          "description": "Both Pro and Mini use a 1920x1080 stage. mini.css only enlarges logos and type for the Mini's smaller panel."
+          "description": "YoloBox Pro and YoloBox Ultra both use pro. mini remains so older rows still validate. The dashboard does not offer it, and mini.html redirects to the Pro renderer."
         },
         "mode": {
           "type": "string",

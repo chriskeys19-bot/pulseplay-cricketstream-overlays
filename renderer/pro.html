@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script src="../js/overlay-target.js"></script>
+  <script>
+    (function () {
+      if (!window.PulsePlayDevice || !window.PulsePlayDevice.proNeedsNormalize(location.search)) return;
+      location.replace(window.PulsePlayDevice.proHref(location.pathname, location.search, location.hash));
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>YoloBox Pro overlay</title>
   <style>html,body{background:transparent;margin:0;height:100%;overflow:hidden}</style>

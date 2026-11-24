@@ -1,4 +1,4 @@
-/* Shared by Pro and Mini. Device files set the stage size and logo placement.
+/* Shared stage. pro.css places logos for YoloBox Pro and YoloBox Ultra.
    Both views stay in the DOM. Opacity is the only switch, so the score iframe is not recreated. */
 html,
 body {
