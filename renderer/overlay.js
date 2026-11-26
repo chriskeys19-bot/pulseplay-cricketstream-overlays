@@ -802,14 +802,14 @@
     return (id || "") + "@" + (asset ? asset.src : "") + "@" + (asset && asset.logo_scale != null ? asset.logo_scale : "");
   }
 
-  function sessionOverride() {
-    var value = queryParam("session").toLowerCase();
-    return value === "am" || value === "pm" ? value : "";
+  function psdGround(ground) {
+    return !!(ground && window.PulsePlayPsd && window.PulsePlayPsd.isGround(ground.id));
   }
 
-  function psdChoice(ground) {
-    if (!ground || !window.PulsePlayPsd || !window.PulsePlayPsd.isGround(ground.id)) return null;
-    return window.PulsePlayPsd.ageSponsor(ground.id, new Date(), sessionOverride());
+  function ageAssetId(ground) {
+    if (window.PulsePlayPsd && window.PulsePlayPsd.ageLogo) return window.PulsePlayPsd.ageLogo(ground);
+    var logos = (ground && ground.logos) || {};
+    return logos.age_group_sponsor || "";
   }
 
   function specSrc(doc, spec) {
@@ -984,12 +984,12 @@
 
   function visualSig(doc, ground) {
     var logos = (ground && ground.logos) || {};
-    var choice = psdChoice(ground);
-    var sponsor = choice && window.PulsePlayPsd.tournamentSponsor();
+    var psd = psdGround(ground);
+    var sponsor = psd && window.PulsePlayPsd.tournamentSponsor();
     return [
       ground ? (ground.mode || "logos_score") : "",
       ground ? (ground.active_ad || "") : "",
-      choice ? choice.session + ":" + choice.assetId : logoPart(doc, logos.age_group_sponsor),
+      logoPart(doc, ageAssetId(ground)),
       logoPart(doc, logos.tournament),
       sponsor ? specSrc(doc, sponsor) : "",
       logoPart(doc, logos.cricketcraze),
@@ -1010,7 +1010,7 @@
     var sig;
     var nextKey;
     var nextPlace;
-    var choice;
+    var psd;
     var sponsor;
     var ageId;
     currentDoc = doc;
@@ -1044,16 +1044,16 @@
     }
     appliedSig = sig;
     logos = ground.logos || {};
-    choice = psdChoice(ground);
-    sponsor = choice ? window.PulsePlayPsd.tournamentSponsor() : null;
-    ageId = choice ? choice.assetId : logos.age_group_sponsor;
-    setLogo("logo-age", choice ? specSrc(doc, choice) : assetSrc(doc, logos.age_group_sponsor));
+    psd = psdGround(ground);
+    sponsor = psd ? window.PulsePlayPsd.tournamentSponsor() : null;
+    ageId = ageAssetId(ground);
+    setLogo("logo-age", assetSrc(doc, ageId));
     setLogo("logo-tournament", assetSrc(doc, logos.tournament));
     setLogo("logo-sponsor", specSrc(doc, sponsor));
     setLogo("logo-ccusa", assetSrc(doc, logos.cricketcraze));
     nextPlace = [
       document.body.getAttribute("data-device") || "",
-      choice ? "psd" : "",
+      psd ? "psd" : "",
       logoScaleFor(doc, ageId),
       logoScaleFor(doc, logos.tournament),
       logoScaleFor(doc, logos.cricketcraze),
@@ -1063,7 +1063,7 @@
       placedKey = nextPlace;
       window.PulsePlayLayout.place({
         device: document.body.getAttribute("data-device"),
-        profile: choice ? "psd" : "",
+        profile: psd ? "psd" : "",
         layout: ground.layout,
         scales: {
           age: logoScaleFor(doc, ageId),

@@ -16,19 +16,8 @@ function loadPsd() {
 }
 
 const psd = loadPsd();
-const MORNING = new Date("2026-11-26T19:30:00.000Z");
-const AFTERNOON = new Date("2026-11-26T21:30:00.000Z");
-const JUST_BEFORE_NOON = new Date("2026-11-26T19:59:00.000Z");
-const NOON = new Date("2026-11-26T20:00:00.000Z");
 
-test("Pacific noon is the AM/PM boundary", () => {
-  assert.equal(psd.sessionOf(JUST_BEFORE_NOON, ""), "am");
-  assert.equal(psd.sessionOf(NOON, ""), "pm");
-  assert.equal(psd.sessionOf(AFTERNOON, "am"), "am");
-  assert.equal(psd.sessionOf(MORNING, "pm"), "pm");
-});
-
-test("single-division PSD grounds keep one sponsor all day", () => {
+test("single-division PSD grounds keep one sponsor for both sessions", () => {
   const allDay = {
     pms1: ["U9", "Dublin Kia"],
     pms2: ["U9", "Dublin Kia"],
@@ -39,8 +28,8 @@ test("single-division PSD grounds keep one sponsor all day", () => {
     sycamore1: ["U15", "Discover San Ramon"]
   };
   for (const id of Object.keys(allDay)) {
-    const am = psd.ageSponsor(id, MORNING, "");
-    const pm = psd.ageSponsor(id, AFTERNOON, "");
+    const am = psd.ageSponsor(id, "am");
+    const pm = psd.ageSponsor(id, "pm");
     assert.equal(am.split, false, id);
     assert.equal(am.division, allDay[id][0], id);
     assert.equal(am.label, allDay[id][1], id);
@@ -49,9 +38,9 @@ test("single-division PSD grounds keep one sponsor all day", () => {
   }
 });
 
-test("CTS West and Sycamore 2 switch sponsor at noon", () => {
-  const westAm = psd.ageSponsor("ctsu11", MORNING, "");
-  const westPm = psd.ageSponsor("ctsu11", AFTERNOON, "");
+test("CTS West and Sycamore 2 list a different afternoon division", () => {
+  const westAm = psd.ageSponsor("ctsu11", "am");
+  const westPm = psd.ageSponsor("ctsu11", "pm");
   assert.equal(westAm.split, true);
   assert.equal(westAm.division, "U13");
   assert.equal(westAm.label, "Fremont Bank");
@@ -59,13 +48,30 @@ test("CTS West and Sycamore 2 switch sponsor at noon", () => {
   assert.equal(westPm.label, "San Ramon Grizzlies");
   assert.notEqual(westAm.assetId, westPm.assetId);
 
-  const syAm = psd.ageSponsor("sycamore2", JUST_BEFORE_NOON, "");
-  const syPm = psd.ageSponsor("sycamore2", NOON, "");
+  const syAm = psd.ageSponsor("sycamore2", "am");
+  const syPm = psd.ageSponsor("sycamore2", "pm");
   assert.equal(syAm.split, true);
   assert.equal(syAm.division, "U15");
   assert.equal(syAm.label, "Discover San Ramon");
   assert.equal(syPm.division, "U13");
   assert.equal(syPm.label, "Fremont Bank");
+});
+
+test("the on-air age logo is the saved sponsor, not the afternoon division", () => {
+  const west = { id: "ctsu11", logos: { age_group_sponsor: "logo-1795110230649" } };
+  assert.equal(psd.ageLogo(west), "logo-1795110230649");
+  assert.notEqual(psd.ageLogo(west), psd.ageSponsor("ctsu11", "pm").assetId);
+
+  const switched = { id: "sycamore2", logos: { age_group_sponsor: "logo-1795110181170" } };
+  assert.equal(psd.ageLogo(switched), "logo-1795110181170");
+  assert.notEqual(psd.ageLogo(switched), psd.ageSponsor("sycamore2", "am").assetId);
+  assert.notEqual(psd.ageLogo(switched), psd.ageSponsor("sycamore2", "pm").assetId);
+
+  assert.equal(psd.ageLogo({ id: "sycamore2", logos: { age_group_sponsor: "" } }), "");
+  assert.equal(psd.ageLogo({ id: "sycamore2", logos: { age_group_sponsor: "  " } }), "");
+  assert.equal(psd.ageLogo({ id: "ctsu11", logos: { age_group_sponsor: null } }), "");
+  assert.equal(psd.ageLogo({ id: "ctsu11" }), "");
+  assert.equal(psd.ageLogo({ id: "cheetahs-home", logos: { age_group_sponsor: "logo-age-group" } }), "logo-age-group");
 });
 
 test("only CTS West and Sycamore 2 are split grounds", () => {
@@ -81,9 +87,24 @@ test("only CTS West and Sycamore 2 are split grounds", () => {
 test("the bottom-left sponsor is Discover San Ramon and other grounds are left alone", () => {
   const sponsor = psd.tournamentSponsor();
   assert.equal(sponsor.label, "Discover San Ramon");
-  assert.equal(sponsor.assetId, psd.ageSponsor("sycamore3", MORNING, "").assetId);
+  assert.equal(sponsor.assetId, psd.ageSponsor("sycamore3", "am").assetId);
   assert.equal(psd.isGround("cheetahs-home"), false);
-  assert.equal(psd.ageSponsor("cheetahs-home", MORNING, ""), null);
-  assert.equal(psd.ageSponsor("fspu15", MORNING, ""), null);
+  assert.equal(psd.ageSponsor("cheetahs-home", "am"), null);
+  assert.equal(psd.ageSponsor("fspu15", "pm"), null);
   assert.equal(psd.isGround("sycamore1"), true);
+});
+
+test("the renderer and ground setup follow the saved age logo", () => {
+  const overlay = readFileSync(join(root, "renderer/overlay.js"), "utf8");
+  const admin = readFileSync(join(root, "admin.js"), "utf8");
+  assert.match(overlay, /PulsePlayPsd\.ageLogo\(ground\)/);
+  assert.doesNotMatch(overlay, /ageSponsor\(/);
+  assert.doesNotMatch(overlay, /queryParam\("session"\)/);
+  assert.match(overlay, /profile: psd \? "psd"/);
+  assert.doesNotMatch(admin, /pick\.disabled = !!psdOn/);
+  assert.doesNotMatch(admin, /not used for a PSD ground/);
+  assert.doesNotMatch(admin, /switches at noon/);
+  assert.match(admin, /does not switch at noon/);
+  assert.match(admin, /ageSponsor\(id, "am"\)/);
+  assert.match(admin, /ageSponsor\(id, "pm"\)/);
 });

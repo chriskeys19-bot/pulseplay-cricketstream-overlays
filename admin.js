@@ -1445,9 +1445,8 @@
     id = field.value;
     return {
       id: id,
-      age: api.ageSponsor(id, new Date(), ""),
-      am: api.ageSponsor(id, new Date(), "am"),
-      pm: api.ageSponsor(id, new Date(), "pm"),
+      am: api.ageSponsor(id, "am"),
+      pm: api.ageSponsor(id, "pm"),
       sponsor: api.tournamentSponsor()
     };
   }
@@ -1456,7 +1455,7 @@
     var note = document.getElementById("psd-sponsor-note");
     var pick = document.getElementById("pick-age");
     var text;
-    if (pick) pick.disabled = !!psdOn;
+    if (pick) pick.disabled = false;
     if (!note) return;
     if (!psdOn) {
       note.classList.add("is-off");
@@ -1464,9 +1463,9 @@
       return;
     }
     if (psdOn.am.division === psdOn.pm.division) {
-      text = "On air, the top-left logo is " + psdOn.age.label + " (" + psdOn.age.division + ") all day. The bottom-left logo is Discover San Ramon, lined up with CricketCrazeUSA. This picker is not used for a PSD ground.";
+      text = "Top-left follows this picker and does not switch at noon. The usual mark for this ground is " + psdOn.am.label + " (" + psdOn.am.division + "). Choose None to leave that corner empty. The bottom-left logo is Discover San Ramon, lined up with CricketCrazeUSA.";
     } else {
-      text = "On air, the top-left logo switches at noon Pacific: " + psdOn.am.label + " (" + psdOn.am.division + ") in the morning and " + psdOn.pm.label + " (" + psdOn.pm.division + ") in the afternoon. The bottom-left logo is Discover San Ramon. This picker is not used for a PSD ground.";
+      text = "Top-left follows this picker and does not switch at noon. Morning is " + psdOn.am.label + " (" + psdOn.am.division + ") and afternoon is " + psdOn.pm.label + " (" + psdOn.pm.division + "), so change this picker when the age group changes. Choose None to leave that corner empty. The bottom-left logo is Discover San Ramon.";
     }
     setText(note, text);
     note.classList.remove("is-off");
@@ -1499,7 +1498,6 @@
     tournament = findAsset(currentDoc, document.getElementById("pick-tournament").value);
     ccusa = findAsset(currentDoc, document.getElementById("pick-ccusa").value);
     psdOn = psdGroundNow();
-    if (psdOn && psdOn.age) age = findAsset(currentDoc, psdOn.age.assetId) || { src: psdOn.age.fallbackSrc, logo_scale: null };
     if (psdOn && psdOn.sponsor) sponsorAsset = findAsset(currentDoc, psdOn.sponsor.assetId) || { src: psdOn.sponsor.fallbackSrc, logo_scale: null };
     else sponsorAsset = null;
     window.PulsePlayLayout.place({
@@ -2665,7 +2663,10 @@
     idInput = document.getElementById("field-id");
     idInput.value = slug(this.value);
   };
-  document.getElementById("field-id").oninput = function () { idTouched = true; };
+  document.getElementById("field-id").oninput = function () {
+    idTouched = true;
+    renderLayoutPreview();
+  };
   document.getElementById("ground-form").onsubmit = onSaveGround;
   document.getElementById("btn-delete-ground").onclick = onDeleteGround;
   document.getElementById("pick-age").onchange = function () { previewPickedLogo("pick-age", "preview-age"); renderLayoutPreview(); };
