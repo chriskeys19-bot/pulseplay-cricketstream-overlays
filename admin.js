@@ -1437,6 +1437,41 @@
     previewSrc(img, asset.src);
   }
 
+  function psdGroundNow() {
+    var id;
+    var api = window.PulsePlayPsd;
+    var field = document.getElementById("field-id");
+    if (!api || !field || !api.isGround(field.value)) return null;
+    id = field.value;
+    return {
+      id: id,
+      age: api.ageSponsor(id, new Date(), ""),
+      am: api.ageSponsor(id, new Date(), "am"),
+      pm: api.ageSponsor(id, new Date(), "pm"),
+      sponsor: api.tournamentSponsor()
+    };
+  }
+
+  function writePsdNote(psdOn) {
+    var note = document.getElementById("psd-sponsor-note");
+    var pick = document.getElementById("pick-age");
+    var text;
+    if (pick) pick.disabled = !!psdOn;
+    if (!note) return;
+    if (!psdOn) {
+      note.classList.add("is-off");
+      setText(note, "");
+      return;
+    }
+    if (psdOn.am.division === psdOn.pm.division) {
+      text = "On air, the top-left logo is " + psdOn.age.label + " (" + psdOn.age.division + ") all day. The bottom-left logo is Discover San Ramon, lined up with CricketCrazeUSA. This picker is not used for a PSD ground.";
+    } else {
+      text = "On air, the top-left logo switches at noon Pacific: " + psdOn.am.label + " (" + psdOn.am.division + ") in the morning and " + psdOn.pm.label + " (" + psdOn.pm.division + ") in the afternoon. The bottom-left logo is Discover San Ramon. This picker is not used for a PSD ground.";
+    }
+    setText(note, text);
+    note.classList.remove("is-off");
+  }
+
   function renderLayoutPreview() {
     var preview = document.getElementById("layout-preview");
     var stage = document.getElementById("layout-stage");
@@ -1446,6 +1481,8 @@
     var age;
     var tournament;
     var ccusa;
+    var psdOn;
+    var sponsorAsset;
     if (!preview || !stage || !window.PulsePlayLayout || !currentDoc) return;
     names = window.PulsePlayLayout.slots;
     for (i = 0; i < names.length; i++) {
@@ -1461,8 +1498,13 @@
     age = findAsset(currentDoc, document.getElementById("pick-age").value);
     tournament = findAsset(currentDoc, document.getElementById("pick-tournament").value);
     ccusa = findAsset(currentDoc, document.getElementById("pick-ccusa").value);
+    psdOn = psdGroundNow();
+    if (psdOn && psdOn.age) age = findAsset(currentDoc, psdOn.age.assetId) || { src: psdOn.age.fallbackSrc, logo_scale: null };
+    if (psdOn && psdOn.sponsor) sponsorAsset = findAsset(currentDoc, psdOn.sponsor.assetId) || { src: psdOn.sponsor.fallbackSrc, logo_scale: null };
+    else sponsorAsset = null;
     window.PulsePlayLayout.place({
       device: document.getElementById("field-device").value,
+      profile: psdOn ? "psd" : "",
       layout: readLayoutForm(),
       scales: {
         age: age && age.logo_scale,
@@ -1471,13 +1513,16 @@
       },
       age: document.getElementById("layout-age"),
       tournament: document.getElementById("layout-tournament"),
+      sponsor: document.getElementById("layout-sponsor"),
       cricketcraze: document.getElementById("layout-ccusa"),
       score: document.getElementById("layout-score"),
       ticker: document.getElementById("layout-ticker")
     });
     setLayoutLogo("layout-age", age);
     setLayoutLogo("layout-tournament", tournament);
+    setLayoutLogo("layout-sponsor", sponsorAsset);
     setLayoutLogo("layout-ccusa", ccusa);
+    writePsdNote(psdOn);
     fitPreviewScore();
     placePreviewTicker();
   }

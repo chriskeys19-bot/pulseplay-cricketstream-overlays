@@ -111,7 +111,7 @@
   }
 
   function isSplitGround(ground) {
-    var catalog = global.PulsePlayPsdGrounds;
+    var catalog = global.PulsePlayPsd;
     if (!catalog || !catalog.isSplit) return false;
     return catalog.isSplit(ground) === true;
   }
