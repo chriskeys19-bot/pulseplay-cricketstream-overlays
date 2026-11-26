@@ -148,5 +148,35 @@
     return 1;
   }
 
-  global.PulsePlayScore = { attach: attach, frameScale: frameScale };
+  /*
+   * ccindex.html is authored for a broadcast frame. At max-width 1800px its
+   * stylesheet scales the page to 0.75 and translates the score bar down by
+   * 80% of its height, which shoves the overs row out of a short iframe.
+   * Give that page a 1920×240 viewport (wider than the breakpoint, tall
+   * enough for the 144px result graphic and its 30px bottom inset) and let
+   * the renderer scale it down to the slot. Other score URLs stay slot-sized.
+   * Measured on CC_1712: the painted bar is 1203×144 and sits 30px up.
+   */
+  var FULL_VIEW = { width: 1920, height: 240 };
+
+  function fullSizePage(url, meta) {
+    var host;
+    var path;
+    var text = String(url || "");
+    if (meta && meta.full_size === true) return true;
+    if (meta && meta.full_size === false) return false;
+    host = hostOf(text);
+    path = pathOf(text);
+    if (host === "overlay.cricclubs.com" || text.indexOf("overlay.cricclubs.com") !== -1) return false;
+    if (host === "static.cricclubs.com") return true;
+    if (path.indexOf("ccindex") !== -1 || path.indexOf("/overlay-cc/") !== -1) return true;
+    return false;
+  }
+
+  function frameViewport(url, meta) {
+    if (!fullSizePage(url, meta)) return null;
+    return { width: FULL_VIEW.width, height: FULL_VIEW.height };
+  }
+
+  global.PulsePlayScore = { attach: attach, frameScale: frameScale, frameViewport: frameViewport };
 })(window);

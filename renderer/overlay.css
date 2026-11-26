@@ -124,8 +124,12 @@ body.mode-ad #subscribe-ticker {
 .logo-ccusa { object-position: right bottom; }
 #score-slot { position: absolute; overflow: visible; background: transparent; }
 #score-frame {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  left: var(--score-left, 0);
+  bottom: 0;
+  width: var(--score-vw, 100%);
+  height: var(--score-vh, 100%);
+  margin: 0 0 0 var(--score-mx, 0);
   border: 0;
   background: transparent;
   color-scheme: normal;
