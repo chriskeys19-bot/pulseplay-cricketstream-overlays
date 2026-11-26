@@ -191,20 +191,66 @@
     return width;
   }
 
+  function setVar(slot, name, value) {
+    if (slot.style.getPropertyValue(name) !== value) slot.style.setProperty(name, value);
+  }
+
+  function clearVar(slot, name) {
+    if (slot.style.getPropertyValue(name)) slot.style.removeProperty(name);
+  }
+
   function fitScore(ground) {
     var slot = document.getElementById("score-slot");
     var frame = document.getElementById("score-frame");
+    var meta;
     var scale;
     var width;
+    var view;
+    var slotW;
+    var slotH;
+    var fit;
     var sx;
     var sy;
+    var paint;
     if (!slot || !frame || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
-    scale = window.PulsePlayScore.frameScale(ground ? ground.score_url : "", scoreMeta(ground));
+    meta = scoreMeta(ground);
+    scale = window.PulsePlayScore.frameScale(ground ? ground.score_url : "", meta);
     width = scoreWidthOf(ground);
-    sx = String(Math.round(scale * width * 1000) / 1000);
-    sy = String(Math.round(scale * 1000) / 1000);
+    view = window.PulsePlayScore.frameViewport
+      ? window.PulsePlayScore.frameViewport(ground ? ground.score_url : "", meta)
+      : null;
+    slotW = parseFloat(slot.style.width);
+    if (!slotW) slotW = slot.offsetWidth || 0;
+    slotH = parseFloat(slot.style.height);
+    if (!slotH) slotH = slot.offsetHeight || 0;
+    /*
+     * A full-size ccindex page is drawn in its own 1920×240 viewport so its
+     * under-1800px rule does not push the overs row out of the frame. Scale
+     * that viewport down to the slot, from the bottom center. The slot's
+     * own scale and nudge stay on the slot. A compact bar still fills the
+     * slot and uses the 2.15 scale.
+     */
+    if (view && view.width && slotW > 0) {
+      fit = slotW / view.width;
+      setVar(slot, "--score-vw", view.width + "px");
+      setVar(slot, "--score-vh", view.height + "px");
+      setVar(slot, "--score-left", "50%");
+      setVar(slot, "--score-mx", (-view.width / 2) + "px");
+      paint = view.height * fit;
+    } else {
+      fit = scale;
+      clearVar(slot, "--score-vw");
+      clearVar(slot, "--score-vh");
+      clearVar(slot, "--score-left");
+      clearVar(slot, "--score-mx");
+      paint = slotH * scale;
+    }
+    sx = String(Math.round(fit * width * 1000) / 1000);
+    sy = String(Math.round(fit * 1000) / 1000);
+    paint = String(Math.round(paint * 1000) / 1000);
     if (slot.style.getPropertyValue("--score-sx") !== sx) slot.style.setProperty("--score-sx", sx);
     if (slot.style.getPropertyValue("--score-sy") !== sy) slot.style.setProperty("--score-sy", sy);
+    if (slot.style.getPropertyValue("--score-paint") !== paint) slot.style.setProperty("--score-paint", paint);
   }
 
   function setScore(ground) {
@@ -823,6 +869,7 @@
     var bottom;
     var height;
     var sy;
+    var paint;
     var next;
     if (!score || !bar) return;
     if (window.PulsePlayLayout && window.PulsePlayLayout.alignTicker) {
@@ -831,14 +878,20 @@
     bottom = parseFloat(score.style.bottom);
     height = parseFloat(score.style.height);
     sy = parseFloat(score.style.getPropertyValue("--score-sy"));
+    paint = parseFloat(score.style.getPropertyValue("--score-paint"));
     if (!sy) sy = 1;
-    if (isNaN(bottom) || isNaN(height)) return;
+    if (isNaN(bottom)) return;
     /* Sit above the painted score, using the score bar's left and width.
-       --score-sy is 2.15 for the short overlay.cricclubs.com bar and 1
-       for a full-size page. Keep the line inside the 1080px stage. */
-    next = window.PulsePlayLayout && window.PulsePlayLayout.tickerBottom
-      ? window.PulsePlayLayout.tickerBottom(bottom, height, sy, bar.offsetHeight || 48) + "px"
-      : Math.round(bottom + height * sy + 10) + "px";
+       --score-paint is the visual height of the frame from the slot bottom.
+       The compact bar still uses slot height times 2.15. Keep the line
+       inside the 1080px stage. */
+    if (!isNaN(paint) && paint > 0 && window.PulsePlayLayout && window.PulsePlayLayout.tickerBottom) {
+      next = window.PulsePlayLayout.tickerBottom(bottom, paint, 1, bar.offsetHeight || 48) + "px";
+    } else if (window.PulsePlayLayout && window.PulsePlayLayout.tickerBottom && !isNaN(height)) {
+      next = window.PulsePlayLayout.tickerBottom(bottom, height, sy, bar.offsetHeight || 48) + "px";
+    } else if (!isNaN(height)) {
+      next = Math.round(bottom + height * sy + 10) + "px";
+    } else return;
     if (bar.style.bottom !== next) bar.style.bottom = next;
   }
 
