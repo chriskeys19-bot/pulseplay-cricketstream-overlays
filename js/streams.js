@@ -176,9 +176,21 @@
     return node ? node.value : "";
   }
 
-  function hideEnded() {
-    var node = document.getElementById("streams-hide-ended");
-    return !node || node.checked;
+  function filters() {
+    return window.PulsePlayStreamFilters || null;
+  }
+
+  function showEnded() {
+    var node = document.getElementById("streams-show-ended");
+    return !!(node && node.getAttribute("aria-pressed") === "true");
+  }
+
+  function passesStreamFilters(row) {
+    var api = filters();
+    if (api && api.isConcealed(row)) return false;
+    if (!showEnded() && isEnded(row)) return false;
+    if (api && !api.eventMatches(row, api.current())) return false;
+    return true;
   }
 
   function visibleRows() {
@@ -191,7 +203,7 @@
     var key;
     for (i = 0; i < streams.length; i++) {
       row = streams[i];
-      if (hideEnded() && isEnded(row)) continue;
+      if (!passesStreamFilters(row)) continue;
       if (ground && row.ground !== ground) continue;
       key = dayKey(row);
       if (day === "upcoming") {
@@ -207,6 +219,13 @@
     return out;
   }
 
+  function hasOption(select, value) {
+    var i;
+    if (!select || !select.options) return false;
+    for (i = 0; i < select.options.length; i++) if (select.options[i].value === value) return true;
+    return false;
+  }
+
   function fillFilters() {
     var daySelect = document.getElementById("streams-day");
     var groundSelect = document.getElementById("streams-ground");
@@ -217,22 +236,32 @@
     var i;
     var key;
     var list;
+    var api = filters();
+    var pool = [];
+    if (api) api.paint(document.getElementById("streams-event"));
     if (!daySelect || !groundSelect) return;
     for (i = 0; i < streams.length; i++) {
-      key = dayKey(streams[i]);
-      if (key) days[key] = dayLabel(streams[i]);
-      if (streams[i].ground) grounds[streams[i].ground] = true;
+      if (api && api.isConcealed(streams[i])) continue;
+      if (api && !api.eventMatches(streams[i], api.current())) continue;
+      pool.push(streams[i]);
+    }
+    for (i = 0; i < pool.length; i++) {
+      key = dayKey(pool[i]);
+      if (key) days[key] = dayLabel(pool[i]);
+      if (pool[i].ground) grounds[pool[i].ground] = true;
     }
     daySelect.innerHTML = "";
     daySelect.appendChild(option("upcoming", "Today & upcoming"));
     list = Object.keys(days).sort();
     for (i = 0; i < list.length; i++) daySelect.appendChild(option(list[i], days[list[i]]));
-    if (dayValue) daySelect.value = dayValue;
+    if (hasOption(daySelect, dayValue)) daySelect.value = dayValue;
+    else daySelect.value = "upcoming";
     groundSelect.innerHTML = "";
     groundSelect.appendChild(option("", "All grounds"));
     list = Object.keys(grounds).sort();
     for (i = 0; i < list.length; i++) groundSelect.appendChild(option(list[i], list[i]));
-    if (groundValue) groundSelect.value = groundValue;
+    if (hasOption(groundSelect, groundValue)) groundSelect.value = groundValue;
+    else groundSelect.value = "";
   }
 
   function option(value, text) {
@@ -480,6 +509,7 @@
         });
       }
       if (window.PulsePlayAdmin && window.PulsePlayAdmin.noteStreams) window.PulsePlayAdmin.noteStreams(streams);
+      if (filters()) filters().noteRows(streams);
       fillFilters();
       if (isOperator()) {
         connected = true;
@@ -497,13 +527,22 @@
   function bind() {
     var day = document.getElementById("streams-day");
     var ground = document.getElementById("streams-ground");
-    var ended = document.getElementById("streams-hide-ended");
+    var ended = document.getElementById("streams-show-ended");
     if (day && day.getAttribute("data-bound") !== "1") {
       day.setAttribute("data-bound", "1");
       day.onchange = paint;
-      ground.onchange = paint;
-      ended.onchange = paint;
+      if (ground) ground.onchange = paint;
+      if (ended) ended.onclick = function () {
+        var on = ended.getAttribute("aria-pressed") === "true";
+        ended.setAttribute("aria-pressed", on ? "false" : "true");
+        paint();
+      };
+      if (filters()) filters().onChange(function () {
+        fillFilters();
+        paint();
+      });
     }
+    fillFilters();
   }
 
   window.PulsePlayStreams = {
@@ -519,7 +558,13 @@
     },
     preview: function (rows) {
       streams = rows || [];
+      if (window.PulsePlayScope) {
+        streams = streams.filter(function (row) {
+          return window.PulsePlayScope.streamVisible(window.PulsePlayAccess, row);
+        });
+      }
       connected = true;
+      if (filters()) filters().noteRows(streams);
       fillFilters();
       paint();
     }
