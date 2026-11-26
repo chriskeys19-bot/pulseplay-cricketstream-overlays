@@ -169,16 +169,39 @@
     });
   }
 
+  function overlayUrl(item) {
+    if (!item || item.url == null) return "";
+    return String(item.url).replace(/^\s+|\s+$/g, "");
+  }
+
+  /*
+   * The active score_overlays entry is the game on screen. score_url is the
+   * fallback when nothing is marked active, which is how a morning row used
+   * to stay up after the afternoon game was selected.
+   */
   function scoreMeta(ground) {
     var list = (ground && ground.score_overlays) || [];
     var i;
-    var fallback = null;
+    var item;
+    var url;
+    var match = null;
     for (i = 0; i < list.length; i++) {
-      if (!list[i]) continue;
-      if (list[i].url === ground.score_url) return list[i];
-      if (list[i].active) fallback = list[i];
+      item = list[i];
+      if (!item) continue;
+      url = overlayUrl(item);
+      if (!url) continue;
+      if (item.active === true) return item;
+      if (!match && ground && url === ground.score_url) match = item;
     }
-    return fallback;
+    return match;
+  }
+
+  function resolvedScoreUrl(ground) {
+    var meta = scoreMeta(ground);
+    var url = overlayUrl(meta);
+    if (meta && meta.active === true && url) return url;
+    if (ground && ground.score_url) return String(ground.score_url).replace(/^\s+|\s+$/g, "");
+    return "";
   }
 
   function scoreWidthOf(ground) {
@@ -231,12 +254,14 @@
     var sx;
     var sy;
     var paint;
+    var scoreUrl;
     if (!slot || !frame || !window.PulsePlayScore || !window.PulsePlayScore.frameScale) return;
     meta = scoreMeta(ground);
-    scale = window.PulsePlayScore.frameScale(ground ? ground.score_url : "", meta);
+    scoreUrl = resolvedScoreUrl(ground);
+    scale = window.PulsePlayScore.frameScale(scoreUrl, meta);
     width = scoreWidthOf(ground);
     view = window.PulsePlayScore.frameViewport
-      ? window.PulsePlayScore.frameViewport(ground ? ground.score_url : "", meta)
+      ? window.PulsePlayScore.frameViewport(scoreUrl, meta)
       : null;
     slotW = parseFloat(slot.style.width);
     if (!slotW) slotW = slot.offsetWidth || 0;
@@ -279,7 +304,7 @@
   }
 
   function setScore(ground) {
-    var url = ground ? ground.score_url : "";
+    var url = resolvedScoreUrl(ground);
     fitScore(ground);
     window.PulsePlayScore.attach({
       iframe: document.getElementById("score-frame"),
@@ -1007,10 +1032,54 @@
     else if (gap !== tickerGap) armTickerWait(doc);
   }
 
+  function scoreWatchMs() {
+    var n = window.PulsePlayScore && Number(window.PulsePlayScore.WATCH_MS);
+    if (!n || !isFinite(n)) return 4000;
+    return n;
+  }
+
+  function canonicalScoreUrl(url) {
+    if (window.PulsePlayStore && window.PulsePlayStore.safeUrl) return window.PulsePlayStore.safeUrl(url) || "";
+    return url || "";
+  }
+
+  /*
+   * appliedSig is stored before the iframe's onload. A poll with the same
+   * signature still has to retry when the frame never reached the canonical
+   * URL, or when data-pending is older than the score-frame watchdog.
+   */
+  function scoreFrameStale(ground) {
+    var frame = document.getElementById("score-frame");
+    var desired = canonicalScoreUrl(resolvedScoreUrl(ground));
+    var current;
+    var pending;
+    var at;
+    if (!frame || !desired) return false;
+    current = frame.getAttribute("data-current") || "";
+    if (current === desired) return false;
+    if (current === "blocked" && window.PulsePlayStore && window.PulsePlayStore.hostBlocksEmbed && window.PulsePlayStore.hostBlocksEmbed(desired)) {
+      return false;
+    }
+    pending = frame.getAttribute("data-pending") || "";
+    if (pending !== desired) return true;
+    at = parseInt(frame.getAttribute("data-pending-at") || "0", 10);
+    if (!at) return true;
+    return new Date().getTime() - at >= scoreWatchMs();
+  }
+
   function visualSig(doc, ground) {
     var logos = (ground && ground.logos) || {};
     var psd = psdGround(ground);
     var sponsor = psd && window.PulsePlayPsd.tournamentSponsor();
+    var meta = scoreMeta(ground);
+    var scoreUrl = resolvedScoreUrl(ground);
+    var scoreId = "";
+    var scoreFull = "";
+    if (meta && meta.active === true && overlayUrl(meta)) scoreId = meta.id == null ? "" : String(meta.id);
+    if (meta && overlayUrl(meta)) {
+      if (meta.full_size === true) scoreFull = "1";
+      else if (meta.full_size === false) scoreFull = "0";
+    }
     return [
       ground ? (ground.mode || "logos_score") : "",
       ground ? (ground.active_ad || "") : "",
@@ -1018,7 +1087,9 @@
       logoPart(doc, logos.tournament),
       sponsor ? specSrc(doc, sponsor) : "",
       logoPart(doc, logos.cricketcraze),
-      ground ? (ground.score_url || "") : "",
+      scoreUrl,
+      scoreId,
+      scoreFull,
       ground && ground.external_video_audio ? "1" : "0",
       (function () {
         var ad = ground ? findAd(doc, ground.active_ad) : null;
@@ -1057,6 +1128,7 @@
     placeTicker();
     sig = visualSig(doc, ground);
     if (sig === appliedSig) {
+      if (scoreFrameStale(ground)) setScore(ground);
       rearmExternal(doc, ground);
       nextPoll = doc.poll_ms || window.PulsePlayStore.DEFAULT_POLL_MS;
       if (nextPoll < 2000) nextPoll = 2000;
