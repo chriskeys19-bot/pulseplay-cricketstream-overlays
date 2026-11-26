@@ -1,17 +1,17 @@
 /*
- * Age-group sponsors for the PSD Youth Cricket Tournament 2026 grounds.
- * Top-left follows the division on that ground. CTS West and Sycamore 2
- * play a different division in the afternoon, so the sponsor changes at
- * noon Pacific. Every other listed ground keeps one sponsor all day.
+ * PSD Youth Cricket Tournament 2026 grounds.
+ * The top-left logo on air is the sponsor saved on the ground
+ * (logos.age_group_sponsor). It does not change at noon Pacific.
+ * This table names the division that usually plays there, so Ground setup
+ * can suggest the morning and afternoon marks. CTS West and Sycamore 2
+ * host two divisions; the operator changes the picker between them.
  * The bottom-left tournament sponsor is Discover San Ramon on all of them.
  * Other tournaments are not in this table and keep the ordinary layout.
  *
  * Divisions come from pp_streams (same ground, same session, all three days).
- * Stanford's id is stanfordu9, and the games on that ground are U11.
+ * Stanford's id is stanfordu9.
  */
 (function (global) {
-  var ZONE = "America/Los_Angeles";
-  var NOON = 12 * 60;
   var PUBLIC = "https://lutcbvzunjcosncvdyke.supabase.co/storage/v1/object/public/pulseplay-assets/logos/";
   var SPONSORS = {
     u9: {
@@ -52,52 +52,30 @@
     hpms: ["u11", "u11"]
   };
 
-  function pacificMinutes(date) {
-    var fmt;
-    var parts;
-    var i;
-    var hour = 0;
-    var minute = 0;
-    var value;
-    fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: ZONE,
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23"
-    });
-    parts = fmt.formatToParts(date instanceof Date ? date : new Date(date));
-    for (i = 0; i < parts.length; i++) {
-      if (parts[i].type === "hour") hour = parseInt(parts[i].value, 10);
-      if (parts[i].type === "minute") minute = parseInt(parts[i].value, 10);
-    }
-    if (hour === 24) hour = 0;
-    if (isNaN(hour)) hour = 0;
-    if (isNaN(minute)) minute = 0;
-    return hour * 60 + minute;
-  }
-
-  function sessionOf(date, override) {
-    var forced = String(override || "").toLowerCase();
-    if (forced === "am" || forced === "pm") return forced;
-    return pacificMinutes(date) < NOON ? "am" : "pm";
-  }
-
   function isGround(id) {
     return Object.prototype.hasOwnProperty.call(GROUNDS, String(id || ""));
   }
 
-  function ageSponsor(id, date, override) {
+  /* The logo Ground setup saved. Empty means the top-left corner stays blank. */
+  function ageLogo(ground) {
+    var id = ground && ground.logos && ground.logos.age_group_sponsor;
+    if (id == null) return "";
+    return String(id).replace(/^\s+|\s+$/g, "");
+  }
+
+  /* Morning or afternoon division for the setup hint. Not what the overlay draws. */
+  function ageSponsor(id, session) {
     var pair = GROUNDS[String(id || "")];
-    var session;
+    var which;
     var key;
     var sponsor;
     if (!pair) return null;
-    session = sessionOf(date, override);
-    key = session === "am" ? pair[0] : pair[1];
+    which = String(session || "").toLowerCase() === "pm" ? "pm" : "am";
+    key = which === "am" ? pair[0] : pair[1];
     sponsor = SPONSORS[key];
     return {
       groundId: String(id),
-      session: session,
+      session: which,
       split: pair[0] !== pair[1],
       division: sponsor.division,
       label: sponsor.label,
@@ -143,8 +121,7 @@
 
   global.PulsePlayPsd = {
     isGround: isGround,
-    sessionOf: sessionOf,
-    pacificMinutes: pacificMinutes,
+    ageLogo: ageLogo,
     ageSponsor: ageSponsor,
     tournamentSponsor: tournamentSponsor,
     isSplit: isSplit,

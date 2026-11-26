@@ -147,7 +147,7 @@ test("a stored short link is the web overlay, including on a split ground", () =
     name: "CTS West",
     short_link: "https://ccusa-overlay.s.gy/ppstreampsdcts"
   };
-  assert.equal(api.webOverlayUrl(cts, "pm", PAGES), "https://ccusa-overlay.s.gy/ppstreampsdcts");
+  assert.equal(api.webOverlayUrl(cts, PAGES), "https://ccusa-overlay.s.gy/ppstreampsdcts");
   const saved = api.overlayChoices(cts, PAGES);
   assert.equal(saved.length, 1);
   assert.equal(saved[0].label, "Web overlay");
@@ -162,36 +162,36 @@ test("a stored short link is the web overlay, including on a split ground", () =
   );
 });
 
-test("split grounds without a short link add the morning or afternoon session", () => {
+test("split grounds without a short link use one renderer URL", () => {
   const cts = { id: "ctsu11", name: "CTS West", short_link: "" };
   const syc = { id: "sycamore2", name: "sycamore2", short_link: "  " };
   const stanford = { id: "stanfordu9", name: "StanfordU9", short_link: "" };
+  const ctsUrl = PAGES + "/renderer/pro.html?ground=ctsu11&device=pro";
+  const sycUrl = PAGES + "/renderer/pro.html?ground=sycamore2&device=pro";
+  assert.equal(api.webOverlayUrl(cts, PAGES), ctsUrl);
+  assert.equal(api.webOverlayUrl(syc, PAGES), sycUrl);
   assert.equal(
-    api.webOverlayUrl(cts, "am", PAGES),
-    PAGES + "/renderer/pro.html?ground=ctsu11&device=pro&session=am"
-  );
-  assert.equal(
-    api.webOverlayUrl(syc, "pm", PAGES),
-    PAGES + "/renderer/pro.html?ground=sycamore2&device=pro&session=pm"
-  );
-  assert.equal(
-    api.webOverlayUrl(stanford, "pm", PAGES),
+    api.webOverlayUrl(stanford, PAGES),
     PAGES + "/renderer/pro.html?ground=stanfordu9&device=pro"
   );
-  assert.equal(api.sessionFromStart("8:30 AM"), "am");
-  assert.equal(api.sessionFromStart("10:30 AM"), "am");
-  assert.equal(api.sessionFromStart("1:30 PM"), "pm");
   const splitChoices = api.overlayChoices(cts, PAGES);
-  assert.equal(splitChoices.length, 2);
-  assert.match(splitChoices[0].url, /session=am$/);
-  assert.match(splitChoices[1].url, /session=pm$/);
-  assert.match(splitChoices[0].label, /AM/);
-  assert.match(splitChoices[1].label, /PM/);
+  assert.equal(splitChoices.length, 1);
+  assert.equal(splitChoices[0].label, "Web overlay");
+  assert.equal(splitChoices[0].url, ctsUrl);
+  assert.doesNotMatch(splitChoices[0].url, /session=/);
   assert.equal(
-    api.streamOverlayUrl({ overlay_url: null, start_local: "1:30 PM" }, cts, PAGES),
-    PAGES + "/renderer/pro.html?ground=ctsu11&device=pro&session=pm"
+    api.streamOverlayUrl({ overlay_url: null, start_local: "8:30 AM" }, cts, PAGES),
+    ctsUrl
   );
-  assert.doesNotMatch(api.webOverlayUrl(cts, "pm", PAGES), /ultra|mini/);
+  assert.equal(
+    api.streamOverlayUrl({ overlay_url: "", start_local: "1:30 PM" }, syc, PAGES),
+    sycUrl
+  );
+  assert.equal(
+    api.streamOverlayUrl({ overlay_url: "https://ccusa-overlay.s.gy/ppstreampsdcts", start_local: "1:30 PM" }, cts, PAGES),
+    "https://ccusa-overlay.s.gy/ppstreampsdcts"
+  );
+  assert.doesNotMatch(api.webOverlayUrl(cts, PAGES), /ultra|mini|session=/);
 });
 
 test("copy uses the clipboard and falls back to a 16px field", async () => {

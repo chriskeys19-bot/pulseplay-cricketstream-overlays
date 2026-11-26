@@ -110,62 +110,25 @@
     return httpUrl(ground && ground.short_link);
   }
 
-  function isSplitGround(ground) {
-    var catalog = global.PulsePlayPsd;
-    if (!catalog || !catalog.isSplit) return false;
-    return catalog.isSplit(ground) === true;
-  }
-
-  function sessionToken(session) {
-    var text = String(session || "").toLowerCase();
-    if (text === "am" || text === "pm") return text;
-    return "";
-  }
-
-  function sessionFromStart(startLocal) {
-    var match = /(\d{1,2}):(\d{2})\s*(AM|PM)/i.exec(String(startLocal || ""));
-    var hour;
-    var ap;
-    if (!match) return "";
-    hour = parseInt(match[1], 10);
-    if (!isFinite(hour)) return "";
-    ap = match[3].toUpperCase();
-    if (ap === "PM" && hour !== 12) hour += 12;
-    if (ap === "AM" && hour === 12) hour = 0;
-    if (hour < 0 || hour > 23) return "";
-    return hour >= 12 ? "pm" : "am";
-  }
-
-  function webOverlayUrl(ground, session, origin) {
+  function webOverlayUrl(ground, origin) {
     var shortLink = storedShortLink(ground);
-    var token;
-    var url;
     if (shortLink) return shortLink;
     if (!ground || !ground.id) return "";
-    url = pagesRendererUrl(origin || PAGES_ORIGIN, ground.id);
-    token = sessionToken(session);
-    if (token && isSplitGround(ground)) url += "&session=" + token;
-    return url;
+    return pagesRendererUrl(origin || PAGES_ORIGIN, ground.id);
   }
 
   function overlayChoices(ground, origin) {
     var url;
     if (!ground) return [];
-    if (storedShortLink(ground) || !isSplitGround(ground)) {
-      url = webOverlayUrl(ground, "", origin);
-      return url ? [{ label: "Web overlay", url: url }] : [];
-    }
-    return [
-      { label: "Web overlay · AM", url: webOverlayUrl(ground, "am", origin) },
-      { label: "Web overlay · PM", url: webOverlayUrl(ground, "pm", origin) }
-    ];
+    url = webOverlayUrl(ground, origin);
+    return url ? [{ label: "Web overlay", url: url }] : [];
   }
 
   function streamOverlayUrl(row, ground, origin) {
     var direct = httpUrl(row && row.overlay_url);
     if (direct) return direct;
     if (!ground) return "";
-    return webOverlayUrl(ground, sessionFromStart(row && (row.start_local || row.start)), origin);
+    return webOverlayUrl(ground, origin);
   }
 
   function buttonLabel(button) {
@@ -233,8 +196,6 @@
     pagesRendererUrl: pagesRendererUrl,
     httpUrl: httpUrl,
     storedShortLink: storedShortLink,
-    isSplitGround: isSplitGround,
-    sessionFromStart: sessionFromStart,
     webOverlayUrl: webOverlayUrl,
     overlayChoices: overlayChoices,
     streamOverlayUrl: streamOverlayUrl,
