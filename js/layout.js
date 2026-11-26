@@ -9,6 +9,11 @@
  * y moves down. Ground rows store only those nudges and a scale, so this
  * anchor is what places the tournament logo on every ground.
  *
+ * profile "psd" is the PSD Youth grounds only. The tournament box copies
+ * the age logo's size and top edge, mirrored to the right. A bottom-left
+ * tournament-sponsor box copies the CricketCrazeUSA size and bottom edge,
+ * mirrored to the left. The score bar stays SCORE_GAP clear of both.
+ *
  * The score bar's right edge is the anchor. It sits SCORE_GAP pixels left of
  * the default CricketCrazeUSA box, and the same left and width are used for
  * the subscribe ticker. If that logo is nudged or scaled so its painted left
@@ -150,15 +155,30 @@
     return paintedLogoLeft(logoEl, logoBase) - SCORE_GAP + nudgeX;
   }
 
-  function placeScore(el, base, slot, logoBase, logoEl) {
+  function paintedLeft(el) {
+    var left;
+    var width;
+    if (!el || !el.style) return NaN;
+    left = parseFloat(el.style.left);
+    width = parseFloat(el.style.width);
+    if (isNaN(left) || isNaN(width)) return NaN;
+    return left + width;
+  }
+
+  function placeScore(el, base, slot, logoBase, logoEl, sponsorEl) {
     var rightEdge;
+    var minLeft;
+    var guard;
     var maxW;
     var w;
     var h;
     var left;
     if (!el) return;
     rightEdge = scoreRightEdge(logoBase, logoEl, slot.x);
-    maxW = rightEdge - SCORE_MIN_LEFT;
+    minLeft = SCORE_MIN_LEFT;
+    guard = paintedLeft(sponsorEl);
+    if (!isNaN(guard)) minLeft = Math.max(minLeft, guard + SCORE_GAP);
+    maxW = rightEdge - minLeft;
     if (maxW < 1) maxW = 1;
     w = Math.round(base.w * slot.scale);
     if (w > maxW) w = maxW;
@@ -166,12 +186,60 @@
     h = Math.round(base.h * slot.scale);
     if (h < 1) h = 1;
     left = rightEdge - w;
-    if (left < SCORE_MIN_LEFT) left = SCORE_MIN_LEFT;
+    if (left < minLeft) left = minLeft;
     clearBox(el);
     el.style.width = w + "px";
     el.style.height = h + "px";
     el.style.left = left + "px";
     el.style.bottom = (base.bottom - slot.y) + "px";
+  }
+
+  /* Same box as the age logo, mirrored to the top-right. slot is an extra nudge. */
+  function placeMatchedTop(el, sourceEl, slot, logoScale) {
+    var scale;
+    var w;
+    var h;
+    var top;
+    var right;
+    if (!el || !sourceEl || !sourceEl.style) return;
+    scale = (slot ? slot.scale : 1) * logoMultiplier(logoScale);
+    w = Math.round(parseFloat(sourceEl.style.width) * scale);
+    h = Math.round(parseFloat(sourceEl.style.height) * scale);
+    if (!(w > 0)) w = 1;
+    if (!(h > 0)) h = 1;
+    top = parseFloat(sourceEl.style.top) + (slot ? slot.y : 0);
+    right = parseFloat(sourceEl.style.left) - (slot ? slot.x : 0);
+    clearBox(el);
+    el.style.width = w + "px";
+    el.style.height = h + "px";
+    el.style.top = top + "px";
+    el.style.right = right + "px";
+  }
+
+  /*
+   * Same rendered size and bottom edge as CricketCrazeUSA. The left inset
+   * is that logo's base right inset, so a nudge that slides CricketCrazeUSA
+   * toward the right edge does not push this mark off the left.
+   */
+  function placeMatchedBottom(el, sourceEl, inset, slot, logoScale) {
+    var scale;
+    var w;
+    var h;
+    var bottom;
+    var left;
+    if (!el || !sourceEl || !sourceEl.style) return;
+    scale = (slot ? slot.scale : 1) * logoMultiplier(logoScale);
+    w = Math.round(parseFloat(sourceEl.style.width) * scale);
+    h = Math.round(parseFloat(sourceEl.style.height) * scale);
+    if (!(w > 0)) w = 1;
+    if (!(h > 0)) h = 1;
+    bottom = parseFloat(sourceEl.style.bottom) - (slot ? slot.y : 0);
+    left = inset + (slot ? slot.x : 0);
+    clearBox(el);
+    el.style.width = w + "px";
+    el.style.height = h + "px";
+    el.style.left = left + "px";
+    el.style.bottom = bottom + "px";
   }
 
   function alignTicker(scoreEl, tickerEl) {
@@ -193,13 +261,20 @@
 
   function place(opts) {
     var device = opts && opts.device === "mini" ? "mini" : "pro";
+    var psd = opts && opts.profile === "psd";
     var base = BASE[device];
     var layout = normalize(opts && opts.layout);
     var scales = (opts && opts.scales) || {};
+    var sponsorSlot = slotOrDefault(opts && opts.layout && opts.layout.sponsor, "sponsor");
     placeLogo(opts.age, base.age, layout.age, scales.age, "top");
-    placeLogo(opts.tournament, base.tournament, layout.tournament, scales.tournament, "top-right");
     placeLogo(opts.cricketcraze, base.cricketcraze, layout.cricketcraze, scales.cricketcraze, "bottom-right");
-    placeScore(opts.score, base.score, layout.score, base.cricketcraze, opts.cricketcraze);
+    if (psd) {
+      placeMatchedTop(opts.tournament, opts.age, layout.tournament, scales.tournament);
+      placeMatchedBottom(opts.sponsor, opts.cricketcraze, base.cricketcraze.right, sponsorSlot, scales.sponsor);
+    } else {
+      placeLogo(opts.tournament, base.tournament, layout.tournament, scales.tournament, "top-right");
+    }
+    placeScore(opts.score, base.score, layout.score, base.cricketcraze, opts.cricketcraze, psd ? opts.sponsor : null);
     alignTicker(opts.score, opts.ticker);
   }
 

@@ -756,6 +756,23 @@
     return (id || "") + "@" + (asset ? asset.src : "") + "@" + (asset && asset.logo_scale != null ? asset.logo_scale : "");
   }
 
+  function sessionOverride() {
+    var value = queryParam("session").toLowerCase();
+    return value === "am" || value === "pm" ? value : "";
+  }
+
+  function psdChoice(ground) {
+    if (!ground || !window.PulsePlayPsd || !window.PulsePlayPsd.isGround(ground.id)) return null;
+    return window.PulsePlayPsd.ageSponsor(ground.id, new Date(), sessionOverride());
+  }
+
+  function specSrc(doc, spec) {
+    var src;
+    if (!spec) return "";
+    src = spec.assetId ? assetSrc(doc, spec.assetId) : "";
+    return src || spec.fallbackSrc || "";
+  }
+
   function tickerLines(doc) {
     var raw = doc && doc.ticker_messages;
     var out = [];
@@ -914,11 +931,14 @@
 
   function visualSig(doc, ground) {
     var logos = (ground && ground.logos) || {};
+    var choice = psdChoice(ground);
+    var sponsor = choice && window.PulsePlayPsd.tournamentSponsor();
     return [
       ground ? (ground.mode || "logos_score") : "",
       ground ? (ground.active_ad || "") : "",
-      logoPart(doc, logos.age_group_sponsor),
+      choice ? choice.session + ":" + choice.assetId : logoPart(doc, logos.age_group_sponsor),
       logoPart(doc, logos.tournament),
+      sponsor ? specSrc(doc, sponsor) : "",
       logoPart(doc, logos.cricketcraze),
       ground ? (ground.score_url || "") : "",
       ground && ground.external_video_audio ? "1" : "0",
@@ -937,6 +957,9 @@
     var sig;
     var nextKey;
     var nextPlace;
+    var choice;
+    var sponsor;
+    var ageId;
     currentDoc = doc;
     ground = findGround(doc);
     if (!groundId || !ground) {
@@ -945,6 +968,7 @@
       hideStatus();
       setLogo("logo-age", "");
       setLogo("logo-tournament", "");
+      setLogo("logo-sponsor", "");
       setLogo("logo-ccusa", "");
       showLogos();
       return;
@@ -967,12 +991,17 @@
     }
     appliedSig = sig;
     logos = ground.logos || {};
-    setLogo("logo-age", assetSrc(doc, logos.age_group_sponsor));
+    choice = psdChoice(ground);
+    sponsor = choice ? window.PulsePlayPsd.tournamentSponsor() : null;
+    ageId = choice ? choice.assetId : logos.age_group_sponsor;
+    setLogo("logo-age", choice ? specSrc(doc, choice) : assetSrc(doc, logos.age_group_sponsor));
     setLogo("logo-tournament", assetSrc(doc, logos.tournament));
+    setLogo("logo-sponsor", specSrc(doc, sponsor));
     setLogo("logo-ccusa", assetSrc(doc, logos.cricketcraze));
     nextPlace = [
       document.body.getAttribute("data-device") || "",
-      logoScaleFor(doc, logos.age_group_sponsor),
+      choice ? "psd" : "",
+      logoScaleFor(doc, ageId),
       logoScaleFor(doc, logos.tournament),
       logoScaleFor(doc, logos.cricketcraze),
       JSON.stringify(ground.layout || null)
@@ -981,14 +1010,16 @@
       placedKey = nextPlace;
       window.PulsePlayLayout.place({
         device: document.body.getAttribute("data-device"),
+        profile: choice ? "psd" : "",
         layout: ground.layout,
         scales: {
-          age: logoScaleFor(doc, logos.age_group_sponsor),
+          age: logoScaleFor(doc, ageId),
           tournament: logoScaleFor(doc, logos.tournament),
           cricketcraze: logoScaleFor(doc, logos.cricketcraze)
         },
         age: document.getElementById("logo-age"),
         tournament: document.getElementById("logo-tournament"),
+        sponsor: document.getElementById("logo-sponsor"),
         cricketcraze: document.getElementById("logo-ccusa"),
         score: document.getElementById("score-slot"),
         ticker: document.getElementById("subscribe-ticker")
