@@ -120,6 +120,7 @@ body.mode-ad #subscribe-ticker {
 .logo { display: block; object-fit: contain; }
 .logo-age { object-position: left top; }
 .logo-tournament { object-position: right top; }
+.logo-sponsor { object-position: left bottom; }
 .logo-ccusa { object-position: right bottom; }
 #score-slot { position: absolute; overflow: visible; background: transparent; }
 #score-frame {

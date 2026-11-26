@@ -295,6 +295,7 @@ legend { color: #c5cebb; font-size: 13px; font-weight: 700; }
 .layout-stage .logo { position: absolute; display: block; object-fit: contain; }
 .layout-stage .logo-age { object-position: left top; }
 .layout-stage .logo-tournament { object-position: right top; }
+.layout-stage .logo-sponsor { object-position: left bottom; }
 .layout-stage .logo-ccusa { object-position: right bottom; }
 .layout-score {
   position: absolute;

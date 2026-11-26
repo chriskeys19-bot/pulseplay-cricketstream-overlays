@@ -275,6 +275,121 @@ test("a larger CricketCrazeUSA logo pulls the score left enough to keep the gap"
   assert.equal(logo.left - score.right, 64);
 });
 
+function stageRect(style) {
+  const width = px(style, "width");
+  const height = px(style, "height");
+  const left = style.left != null && style.left !== "auto" ? px(style, "left") : 1920 - px(style, "right") - width;
+  const top = style.top != null && style.top !== "auto" ? px(style, "top") : 1080 - px(style, "bottom") - height;
+  return { left, top, right: left + width, bottom: top + height, width, height };
+}
+
+function overlaps(a, b) {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+function placePsd(layout, scales) {
+  const nodes = {
+    age: box(),
+    tournament: box(),
+    sponsor: box(),
+    cricketcraze: box(),
+    score: box(),
+    ticker: box()
+  };
+  loadLayout().place({
+    device: "pro",
+    profile: "psd",
+    layout: layout,
+    scales: scales,
+    age: nodes.age,
+    tournament: nodes.tournament,
+    sponsor: nodes.sponsor,
+    cricketcraze: nodes.cricketcraze,
+    score: nodes.score,
+    ticker: nodes.ticker
+  });
+  return nodes;
+}
+
+test("PSD tournament matches the age logo and the sponsor matches CricketCrazeUSA", () => {
+  const nodes = placePsd(null);
+  const age = stageRect(nodes.age.style);
+  const tournament = stageRect(nodes.tournament.style);
+  const sponsor = stageRect(nodes.sponsor.style);
+  const ccusa = stageRect(nodes.cricketcraze.style);
+  assert.equal(tournament.top, age.top);
+  assert.equal(tournament.width, age.width);
+  assert.equal(tournament.height, age.height);
+  assert.equal(tournament.right, 1920 - age.left);
+  assert.equal(sponsor.bottom, ccusa.bottom);
+  assert.equal(sponsor.width, ccusa.width);
+  assert.equal(sponsor.height, ccusa.height);
+  assert.equal(sponsor.left, 1920 - ccusa.right);
+  assert.equal(age.left, 40);
+  assert.equal(age.top, 20);
+  assert.equal(age.width, 168);
+  assert.equal(age.height, 84);
+  assert.equal(sponsor.left, 40);
+  assert.equal(1080 - sponsor.bottom, 20);
+  assert.equal(1080 - ccusa.bottom, 20);
+  assert.equal(ccusa.right, 1880);
+});
+
+test("a scaled PSD age logo keeps the tournament lined up with it", () => {
+  const nodes = placePsd({ age: { scale: 1.1, x: 0, y: 4 } }, { age: 1 });
+  const age = stageRect(nodes.age.style);
+  const tournament = stageRect(nodes.tournament.style);
+  assert.equal(age.width, 185);
+  assert.equal(age.height, 92);
+  assert.equal(age.top, 24);
+  assert.equal(tournament.width, age.width);
+  assert.equal(tournament.height, age.height);
+  assert.equal(tournament.top, age.top);
+  assert.equal(tournament.right, 1920 - age.left);
+});
+
+test("PSD score stays 64px clear of both bottom logos on the live ground layouts", () => {
+  const grounds = [
+    { name: "PMS-1", layout: { age: { scale: 1.1 }, score: { scale: 1.16 } } },
+    { name: "CTS West", layout: { score: { scale: 1.16, y: -10 } } },
+    { name: "Sycamore 2", layout: { age: { scale: 1.1 }, score: { scale: 1.16 } } },
+    { name: "Sycamore 3", layout: { age: { scale: 1.1 }, score: { scale: 1.25, x: -10 } } },
+    { name: "4Leaf", layout: { age: { scale: 0.9 }, score: { y: -60 }, cricketcraze: { x: 60, scale: 0.85 } } },
+    { name: "HPMS", layout: { age: { scale: 1.1 }, score: { scale: 1.16 } } },
+    { name: "Stanford", layout: null }
+  ];
+  for (const ground of grounds) {
+    const nodes = placePsd(ground.layout);
+    const score = stageRect(nodes.score.style);
+    const sponsor = stageRect(nodes.sponsor.style);
+    const ccusa = stageRect(nodes.cricketcraze.style);
+    const age = stageRect(nodes.age.style);
+    const tournament = stageRect(nodes.tournament.style);
+    assert.ok(score.left >= 0 && score.right <= 1920, ground.name + " score leaves the stage");
+    assert.ok(score.top >= 0 && score.bottom <= 1080, ground.name + " score leaves the stage vertically");
+    assert.ok(!overlaps(score, sponsor), ground.name + " score hits the tournament sponsor");
+    assert.ok(!overlaps(score, ccusa), ground.name + " score hits CricketCrazeUSA");
+    assert.ok(!overlaps(age, tournament), ground.name + " top logos collide");
+    assert.ok(!overlaps(sponsor, ccusa), ground.name + " bottom logos collide");
+    assert.ok(score.left - sponsor.right >= 64, ground.name + " sponsor gap " + (score.left - sponsor.right));
+    assert.ok(ccusa.left - score.right >= 64, ground.name + " ccusa gap " + (ccusa.left - score.right));
+    assert.equal(nodes.ticker.style.left, nodes.score.style.left);
+    assert.equal(nodes.ticker.style.width, nodes.score.style.width);
+  }
+});
+
+test("a non-PSD ground keeps the previous tournament size and score bar", () => {
+  const nodes = place("pro", { age: { scale: 1.1 }, score: { scale: 1.16 } });
+  assert.equal(nodes.tournament.style.width, "180px");
+  assert.equal(nodes.tournament.style.height, "140px");
+  assert.equal(nodes.tournament.style.right, "40px");
+  assert.equal(nodes.tournament.style.top, "20px");
+  const score = scoreBox(nodes.score.style);
+  assert.equal(score.left, 16);
+  assert.equal(score.right, 1626);
+  assert.equal(score.width, 1610);
+});
+
 test("the subscribe ticker matches the score bar and stays on the stage", () => {
   const layout = loadLayout();
   const nodes = {
@@ -322,9 +437,12 @@ test("renderer CSS, the admin preview, and the docs use the top-right corner", (
   assert.match(adminHtml, /Top right · Tournament/);
   assert.match(adminJs, /Top right · Tournament/);
   assert.match(readme, /\| Top right \| Tournament logo \|/);
-  for (const file of [pro, mini, overlay, adminCss, adminHtml, adminJs, readme]) {
-    assert.doesNotMatch(file, /Bottom left|bottom-left|left bottom/);
-  }
+  assert.match(pro, /\.logo-sponsor \{ position: absolute; left: 40px; bottom: 20px; width: 190px; \}/);
+  assert.match(mini, /\.logo-sponsor \{ position: absolute; left: 28px; bottom: 13px; width: 220px; \}/);
+  assert.match(overlay, /\.logo-sponsor \{ object-position: left bottom; \}/);
+  assert.match(adminCss, /\.layout-stage \.logo-sponsor \{ object-position: left bottom; \}/);
+  assert.doesNotMatch(pro, /\.logo-tournament[^{]*\{[^}]*bottom/);
+  assert.doesNotMatch(mini, /\.logo-tournament[^{]*\{[^}]*bottom/);
 });
 
 test("Pro and Mini CSS, the admin preview, and the README use the shifted score bar", () => {
