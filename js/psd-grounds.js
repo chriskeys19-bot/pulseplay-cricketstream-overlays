@@ -115,12 +115,39 @@
     };
   }
 
+  var NAMES = {
+    "cts west": "ctsu11",
+    "sycamore 2": "sycamore2"
+  };
+
+  function groundKey(ground) {
+    var id;
+    var name;
+    if (!ground) return "";
+    if (typeof ground === "string") {
+      id = String(ground).replace(/^\s+|\s+$/g, "").toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(GROUNDS, id)) return id;
+      return NAMES[id] || "";
+    }
+    id = String(ground.id || "").replace(/^\s+|\s+$/g, "").toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(GROUNDS, id)) return id;
+    name = String(ground.name || "").replace(/^\s+|\s+$/g, "").toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(GROUNDS, name)) return name;
+    return NAMES[name] || "";
+  }
+
+  function isSplit(ground) {
+    var pair = GROUNDS[groundKey(ground)];
+    return !!(pair && pair[0] !== pair[1]);
+  }
+
   global.PulsePlayPsd = {
     isGround: isGround,
     sessionOf: sessionOf,
     pacificMinutes: pacificMinutes,
     ageSponsor: ageSponsor,
     tournamentSponsor: tournamentSponsor,
+    isSplit: isSplit,
     grounds: GROUNDS
   };
 })(typeof window !== "undefined" ? window : global);

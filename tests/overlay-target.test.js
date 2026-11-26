@@ -10,6 +10,9 @@ const PAGES = "https://chriskeys19-bot.github.io/pulseplay-cricketstream-overlay
 function loadApi() {
   const context = { window: {} };
   vm.createContext(context);
+  vm.runInContext(readFileSync(join(root, "js/psd-grounds.js"), "utf8"), context, {
+    filename: "js/psd-grounds.js"
+  });
   vm.runInContext(readFileSync(join(root, "js/overlay-target.js"), "utf8"), context, {
     filename: "js/overlay-target.js"
   });
@@ -138,6 +141,114 @@ test("device labels and saved overlay URLs stay on the Pro renderer", () => {
   assert.doesNotMatch(api.pagesRendererUrl(PAGES, "sycamore2"), /mini|ultra/);
 });
 
+test("a stored short link is the web overlay, including on a split ground", () => {
+  const cts = {
+    id: "ctsu11",
+    name: "CTS West",
+    short_link: "https://ccusa-overlay.s.gy/ppstreampsdcts"
+  };
+  assert.equal(api.webOverlayUrl(cts, "pm", PAGES), "https://ccusa-overlay.s.gy/ppstreampsdcts");
+  const saved = api.overlayChoices(cts, PAGES);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].label, "Web overlay");
+  assert.equal(saved[0].url, "https://ccusa-overlay.s.gy/ppstreampsdcts");
+  assert.equal(
+    api.streamOverlayUrl({ overlay_url: "", start_local: "1:30 PM", ground: "CTS West" }, cts, PAGES),
+    "https://ccusa-overlay.s.gy/ppstreampsdcts"
+  );
+  assert.equal(
+    api.streamOverlayUrl({ overlay_url: "https://ccusa-overlay.s.gy/mscaavengers", start_local: "8:30 AM" }, cts, PAGES),
+    "https://ccusa-overlay.s.gy/mscaavengers"
+  );
+});
+
+test("split grounds without a short link add the morning or afternoon session", () => {
+  const cts = { id: "ctsu11", name: "CTS West", short_link: "" };
+  const syc = { id: "sycamore2", name: "sycamore2", short_link: "  " };
+  const stanford = { id: "stanfordu9", name: "StanfordU9", short_link: "" };
+  assert.equal(
+    api.webOverlayUrl(cts, "am", PAGES),
+    PAGES + "/renderer/pro.html?ground=ctsu11&device=pro&session=am"
+  );
+  assert.equal(
+    api.webOverlayUrl(syc, "pm", PAGES),
+    PAGES + "/renderer/pro.html?ground=sycamore2&device=pro&session=pm"
+  );
+  assert.equal(
+    api.webOverlayUrl(stanford, "pm", PAGES),
+    PAGES + "/renderer/pro.html?ground=stanfordu9&device=pro"
+  );
+  assert.equal(api.sessionFromStart("8:30 AM"), "am");
+  assert.equal(api.sessionFromStart("10:30 AM"), "am");
+  assert.equal(api.sessionFromStart("1:30 PM"), "pm");
+  const splitChoices = api.overlayChoices(cts, PAGES);
+  assert.equal(splitChoices.length, 2);
+  assert.match(splitChoices[0].url, /session=am$/);
+  assert.match(splitChoices[1].url, /session=pm$/);
+  assert.match(splitChoices[0].label, /AM/);
+  assert.match(splitChoices[1].label, /PM/);
+  assert.equal(
+    api.streamOverlayUrl({ overlay_url: null, start_local: "1:30 PM" }, cts, PAGES),
+    PAGES + "/renderer/pro.html?ground=ctsu11&device=pro&session=pm"
+  );
+  assert.doesNotMatch(api.webOverlayUrl(cts, "pm", PAGES), /ultra|mini/);
+});
+
+test("copy uses the clipboard and falls back to a 16px field", async () => {
+  const context = { window: {}, Promise };
+  vm.createContext(context);
+  vm.runInContext(readFileSync(join(root, "js/overlay-target.js"), "utf8"), context, {
+    filename: "js/overlay-target.js"
+  });
+  const button = {
+    textContent: "Copy",
+    classNames: [],
+    classList: {
+      add(name) { button.classNames.push(name); },
+      remove(name) { button.classNames = button.classNames.filter((item) => item !== name); }
+    },
+    getAttribute() { return "Copy"; }
+  };
+  let wrote = "";
+  context.window.setTimeout = () => 1;
+  context.window.clearTimeout = () => {};
+  context.window.navigator = {
+    clipboard: {
+      writeText(text) {
+        wrote = text;
+        return Promise.resolve();
+      }
+    }
+  };
+  context.window.PulsePlayDevice.copyText("https://ccusa-overlay.s.gy/hpms", button);
+  await Promise.resolve();
+  assert.equal(wrote, "https://ccusa-overlay.s.gy/hpms");
+  assert.equal(button.textContent, "Copied");
+  assert.deepEqual(button.classNames, ["is-copied"]);
+
+  const area = { value: "", style: {}, setAttribute() {}, focus() {}, select() {}, setSelectionRange() {} };
+  let command = false;
+  const fallbackButton = {
+    textContent: "Copy",
+    classList: { add() {}, remove() {} },
+    getAttribute() { return "Copy"; }
+  };
+  context.window.navigator = {};
+  context.window.document = {
+    body: {
+      appendChild() {},
+      removeChild() {}
+    },
+    createElement() { return area; },
+    execCommand() { command = true; return true; }
+  };
+  context.window.PulsePlayDevice.copyText("https://ccusa-overlay.s.gy/pms1", fallbackButton);
+  assert.equal(command, true);
+  assert.equal(area.value, "https://ccusa-overlay.s.gy/pms1");
+  assert.equal(area.style.fontSize, "16px");
+  assert.equal(fallbackButton.textContent, "Copied");
+});
+
 test("the mini page replaces the URL and offers a refresh and link fallback", () => {
   const result = runPageScript(miniHtml, {
     search: "?ground=sycamore2&device=mini",
@@ -196,7 +307,12 @@ test("pro.html normalizes device=mini before the overlay runs", () => {
 test("admin offers only YoloBox Pro / Ultra and builds pro overlay URLs", () => {
   assert.match(adminHtml, /<option value="pro">YoloBox Pro \/ Ultra<\/option>/);
   assert.doesNotMatch(adminHtml, /<option value="mini"|YoloBox Mini|>Mini</);
+  assert.match(adminHtml, /js\/psd-grounds\.js/);
   assert.match(adminHtml, /js\/overlay-target\.js/);
+  assert.match(adminJs, /PulsePlayDevice\.overlayChoices\(ground, PAGES\)/);
+  assert.match(readFileSync(join(root, "js/streams.js"), "utf8"), /streamOverlayUrl/);
+  assert.match(readFileSync(join(root, "admin.css"), "utf8"), /\.card__overlay a, \.stream-link a/);
+  assert.match(readFileSync(join(root, "admin.css"), "utf8"), /min-height:\s*44px/);
   assert.match(adminJs, /PulsePlayDevice\.deviceLabel\(\)/);
   assert.match(adminJs, /PulsePlayDevice\.savedDevice\(\)/);
   assert.match(adminJs, /PulsePlayDevice\.pagesRendererUrl\(PAGES, id\)/);

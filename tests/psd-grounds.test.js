@@ -68,6 +68,16 @@ test("CTS West and Sycamore 2 switch sponsor at noon", () => {
   assert.equal(syPm.label, "Fremont Bank");
 });
 
+test("only CTS West and Sycamore 2 are split grounds", () => {
+  assert.equal(psd.isSplit({ id: "ctsu11", name: "CTS West" }), true);
+  assert.equal(psd.isSplit("sycamore 2"), true);
+  assert.equal(psd.isSplit({ id: "sycamore2", name: "sycamore2" }), true);
+  assert.equal(psd.isSplit({ id: "stanfordu9", name: "StanfordU9" }), false);
+  assert.equal(psd.isSplit({ id: "4leaf", name: "4leaf" }), false);
+  assert.equal(psd.isSplit({ id: "hpms", name: "HPMS" }), false);
+  assert.equal(psd.isSplit("cheetahs-home"), false);
+});
+
 test("the bottom-left sponsor is Discover San Ramon and other grounds are left alone", () => {
   const sponsor = psd.tournamentSponsor();
   assert.equal(sponsor.label, "Discover San Ramon");

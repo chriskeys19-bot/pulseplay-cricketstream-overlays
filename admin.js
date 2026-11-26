@@ -12,6 +12,7 @@
   var currentId = "";
   var actionSig = "";
   var centerSig = "";
+  var streamLinkSig = "";
   var librarySig = null;
   var logoSig = null;
   var setupSig = null;
@@ -777,18 +778,10 @@
     box.classList.add("is-warn");
   }
 
-  function copyText(text) {
-    var input;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).catch(function () {});
-      return;
+  function copyText(text, button) {
+    if (window.PulsePlayDevice && window.PulsePlayDevice.copyText) {
+      window.PulsePlayDevice.copyText(text, button);
     }
-    input = document.createElement("input");
-    input.value = text;
-    document.body.appendChild(input);
-    input.select();
-    try { document.execCommand("copy"); } catch (e) {}
-    document.body.removeChild(input);
   }
 
   function rendererPageUrl(ground) {
@@ -810,13 +803,12 @@
     row.appendChild(document.createTextNode(label + " " + text + " "));
     button.type = "button";
     button.className = "btn-text";
+    button.setAttribute("data-label", "Copy");
     setText(button, "Copy");
     button.onclick = function (event) {
       if (event.preventDefault) event.preventDefault();
       if (event.stopPropagation) event.stopPropagation();
-      copyText(text);
-      setText(button, "Copied");
-      window.setTimeout(function () { setText(button, "Copy"); }, 1200);
+      copyText(text, button);
     };
     row.appendChild(button);
     card.appendChild(row);
@@ -893,6 +885,51 @@
     }
     syncCardStill(card, ground);
     syncCardScore(card, ground);
+    syncCardOverlay(card, ground);
+  }
+
+  function overlayLine(label, url) {
+    var row = document.createElement("div");
+    var name = document.createElement("span");
+    var link = document.createElement("a");
+    var button = document.createElement("button");
+    row.className = "card__overlay";
+    name.className = "card__overlay-label";
+    setText(name, label);
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    setText(link, url);
+    button.type = "button";
+    button.className = "btn-copy";
+    button.setAttribute("data-label", "Copy");
+    setText(button, "Copy");
+    button.onclick = function (event) {
+      if (event.preventDefault) event.preventDefault();
+      if (event.stopPropagation) event.stopPropagation();
+      copyText(url, button);
+    };
+    row.appendChild(name);
+    row.appendChild(link);
+    row.appendChild(button);
+    return row;
+  }
+
+  function syncCardOverlay(card, ground) {
+    var box = childByClass(card, "card__overlays");
+    var choices = window.PulsePlayDevice && window.PulsePlayDevice.overlayChoices
+      ? window.PulsePlayDevice.overlayChoices(ground, PAGES)
+      : [];
+    var parts = [];
+    var sig;
+    var i;
+    if (!box) return;
+    for (i = 0; i < choices.length; i++) parts.push(choices[i].label + "=" + choices[i].url);
+    sig = parts.join("|");
+    if (box.getAttribute("data-sig") === sig) return;
+    box.setAttribute("data-sig", sig);
+    clear(box);
+    for (i = 0; i < choices.length; i++) box.appendChild(overlayLine(choices[i].label, choices[i].url));
   }
 
   function syncCardScore(card, ground) {
@@ -951,8 +988,7 @@
     var name = document.createElement("h3");
     var pill = document.createElement("span");
     var mode = document.createElement("p");
-    var shortP = document.createElement("p");
-    var shortA = document.createElement("a");
+    var overlays = document.createElement("div");
     var time = document.createElement("p");
     var slot = document.createElement("div");
     var iframe = document.createElement("iframe");
@@ -974,13 +1010,7 @@
     badge.className = "card__stuck";
     head.appendChild(badge);
     mode.className = "card__mode";
-    shortP.className = "card__short";
-    shortA.href = ground.short_link;
-    shortA.target = "_blank";
-    shortA.rel = "noopener";
-    setText(shortA, ground.short_link);
-    shortP.appendChild(document.createTextNode("Short link: "));
-    shortP.appendChild(shortA);
+    overlays.className = "card__overlays";
     time.className = "card__time";
     slot.className = "score-slot";
     var still = document.createElement("img");
@@ -1015,7 +1045,7 @@
     card.appendChild(head);
     card.appendChild(mode);
     card.appendChild(reset);
-    card.appendChild(shortP);
+    card.appendChild(overlays);
     card.appendChild(time);
     card.appendChild(slot);
     card.appendChild(scoreP);
@@ -1864,6 +1894,17 @@
     if (!document.getElementById("panel-logos").classList.contains("is-off")) renderLogoLibrary();
     if (!document.getElementById("panel-setup").classList.contains("is-off")) renderSetupList();
     if (!document.getElementById("panel-ticker").classList.contains("is-off")) loadTickerForm();
+    refreshStreamLinks();
+  }
+
+  function refreshStreamLinks() {
+    var panel = document.getElementById("panel-streams");
+    var sig;
+    if (!panel || panel.classList.contains("is-off") || !window.PulsePlayStreams) return;
+    sig = groundIds().join("|");
+    if (sig === streamLinkSig) return;
+    streamLinkSig = sig;
+    window.PulsePlayStreams.show();
   }
 
   function saveDoc(hint) {

@@ -15,8 +15,13 @@
     "cts west": "ctsu11",
     "4leaf east": "4leaf",
     "sycamore 2": "sycamore2",
+    "sycamore 3": "sycamore3",
+    sycamore3: "sycamore3",
     "pms-1": "pms1",
-    pms1: "pms1"
+    pms1: "pms1",
+    "pms-2": "pms2",
+    pms2: "pms2",
+    hpms: "hpms"
   };
   var CODE = /^[A-Z][A-Z0-9]{1,11}$/;
 

@@ -16,8 +16,13 @@
     "cts west": "ctsu11",
     "4leaf east": "4leaf",
     "sycamore 2": "sycamore2",
+    "sycamore 3": "sycamore3",
+    sycamore3: "sycamore3",
     "pms-1": "pms1",
-    pms1: "pms1"
+    pms1: "pms1",
+    "pms-2": "pms2",
+    pms2: "pms2",
+    hpms: "hpms"
   };
 
   function setText(node, text) {
@@ -107,38 +112,9 @@
   }
 
   function copyText(text, button) {
-    function markCopied() {
-      if (button.copyTimer) window.clearTimeout(button.copyTimer);
-      setText(button, "Copied");
-      button.copyTimer = window.setTimeout(function () {
-        setText(button, button.getAttribute("data-label") || "Copy");
-      }, 1500);
+    if (window.PulsePlayDevice && window.PulsePlayDevice.copyText) {
+      window.PulsePlayDevice.copyText(text, button);
     }
-    function fallback() {
-      var area = document.createElement("textarea");
-      var copied = false;
-      area.value = text;
-      area.setAttribute("readonly", "readonly");
-      area.style.position = "fixed";
-      area.style.top = "0";
-      area.style.left = "0";
-      area.style.width = "1px";
-      area.style.height = "1px";
-      area.style.opacity = "0";
-      area.style.fontSize = "16px";
-      document.body.appendChild(area);
-      area.focus();
-      area.select();
-      area.setSelectionRange(0, area.value.length);
-      try { copied = document.execCommand("copy"); } catch (e) { copied = false; }
-      document.body.removeChild(area);
-      if (copied) markCopied();
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(markCopied).catch(fallback);
-      return;
-    }
-    fallback();
   }
 
   function copyButton(text) {
@@ -151,19 +127,43 @@
     return node;
   }
 
+  function groundList() {
+    if (window.PulsePlayAdmin && window.PulsePlayAdmin.grounds) return window.PulsePlayAdmin.grounds() || [];
+    return [];
+  }
+
   function groundIdFor(name) {
     var key = String(name || "").toLowerCase();
-    var list;
+    var list = groundList();
     var i;
     var ground;
     if (GROUND_IDS[key]) return GROUND_IDS[key];
-    list = window.PulsePlayAdmin && window.PulsePlayAdmin.grounds ? window.PulsePlayAdmin.grounds() : [];
     for (i = 0; i < list.length; i++) {
       ground = list[i];
       if (ground && String(ground.name || "").toLowerCase() === key) return ground.id;
       if (ground && String(ground.id || "").toLowerCase() === key.replace(/[^a-z0-9]/g, "")) return ground.id;
     }
+    if (window.PulsePlayScope && window.PulsePlayScope.groundMatches) {
+      for (i = 0; i < list.length; i++) {
+        if (window.PulsePlayScope.groundMatches(list[i], { ground: name })) return list[i].id;
+      }
+    }
     return "";
+  }
+
+  function groundRecordFor(name) {
+    var list = groundList();
+    var id = groundIdFor(name);
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (id && list[i] && list[i].id === id) return list[i];
+    }
+    return null;
+  }
+
+  function overlayForRow(row) {
+    if (!window.PulsePlayDevice || !window.PulsePlayDevice.streamOverlayUrl) return "";
+    return window.PulsePlayDevice.streamOverlayUrl(row, groundRecordFor(row && row.ground));
   }
 
   function selectedDay() {
@@ -369,13 +369,28 @@
       watch.appendChild(watchText);
       watch.appendChild(copyButton("https://www.youtube.com/watch?v=" + row.video_id));
       card.appendChild(watch);
-      overlay = document.createElement("p");
-      overlay.className = "stream-link";
-      var overlayText = document.createElement("span");
-      var overlayUrl = httpUrl(row.overlay_url);
-      setText(overlayText, "Overlay: " + (row.overlay_url || "not set yet"));
-      overlay.appendChild(overlayText);
-      if (overlayUrl) overlay.appendChild(copyButton(overlayUrl));
+      overlay = document.createElement("div");
+      overlay.className = "stream-link stream-overlay";
+      var overlayLabel = document.createElement("span");
+      var overlayUrl = overlayForRow(row);
+      var overlayLink;
+      var overlayMissing;
+      overlayLabel.className = "stream-overlay-label";
+      setText(overlayLabel, "Web overlay");
+      overlay.appendChild(overlayLabel);
+      if (overlayUrl) {
+        overlayLink = document.createElement("a");
+        overlayLink.href = overlayUrl;
+        overlayLink.target = "_blank";
+        overlayLink.rel = "noopener noreferrer";
+        setText(overlayLink, overlayUrl);
+        overlay.appendChild(overlayLink);
+        overlay.appendChild(copyButton(overlayUrl));
+      } else {
+        overlayMissing = document.createElement("span");
+        setText(overlayMissing, "not set yet");
+        overlay.appendChild(overlayMissing);
+      }
       card.appendChild(overlay);
       actions = document.createElement("div");
       actions.className = "stream-actions broadcast-actions";
