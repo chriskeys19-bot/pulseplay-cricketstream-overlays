@@ -455,6 +455,48 @@ input, select, textarea, button { font-size: 16px; }
   align-items: center;
   text-decoration: none;
 }
+.stream-filter-label {
+  display: block;
+  margin: 0 0 4px;
+  color: #c5cebb;
+  font-size: 13px;
+  font-weight: 700;
+}
+.stream-event { max-width: 100%; }
+.wall-event {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.wall-event .stream-filter-label { margin: 0; }
+.stream-event-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.stream-event-picks button,
+.stream-toggle {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 16px;
+  border: 1px solid #31402d;
+  border-radius: 8px;
+  background: #10160f;
+  color: #f6f3ea;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.stream-event-picks button[aria-checked="true"],
+.stream-toggle[aria-pressed="true"] {
+  background: #e4b75a;
+  color: #2a210c;
+  border-color: #e4b75a;
+}
+.stream-filters .stream-toggle { align-self: end; }
 .wall-grid {
   display: grid;
   grid-template-columns: repeat(var(--wall-cols, 1), minmax(0, 1fr));

@@ -51,9 +51,13 @@
       </div>
       <p id="streams-youtube" class="broadcast-notice is-off" role="status"></p>
       <div class="stream-filters">
+        <div class="stream-event">
+          <span class="stream-filter-label" id="streams-event-label">Event</span>
+          <div id="streams-event" class="stream-event-picks" role="radiogroup" aria-labelledby="streams-event-label"></div>
+        </div>
         <label>Day <select id="streams-day"><option value="upcoming">Today &amp; upcoming</option></select></label>
         <label>Ground <select id="streams-ground"><option value="">All grounds</option></select></label>
-        <label class="check"><input type="checkbox" id="streams-hide-ended" checked> Hide ended</label>
+        <button type="button" id="streams-show-ended" class="stream-toggle" aria-pressed="false">Show ended</button>
       </div>
       <div id="streams-list"></div>
     </section>
@@ -338,6 +342,10 @@
           <p id="wall-intro">Muted multi-view for a TV laptop. Every tile stays silent. A game is on the wall when its status or the YouTube broadcast is live, including a broadcast still in testing. If that status is empty, the wall uses the scheduled window: 15 minutes before the start until 3 hours 30 minutes after. Ended stays off. Up to 8 games, earliest explicit live games first.</p>
         </div>
         <div class="wall-toolbar">
+          <div class="stream-event wall-event">
+            <span class="stream-filter-label" id="wall-event-label">Event</span>
+            <div id="wall-event" class="stream-event-picks" role="radiogroup" aria-labelledby="wall-event-label"></div>
+          </div>
           <button type="button" id="wall-kiosk">Hide chrome</button>
           <button type="button" id="wall-fullscreen">Fullscreen wall</button>
           <button type="button" id="wall-sample">Preview sample games</button>
@@ -392,6 +400,7 @@
   <script src="js/live-wall.js"></script>
   <script src="js/pp-tabs.js"></script>
   <script src="js/scope.js"></script>
+  <script src="js/stream-filters.js"></script>
   <script src="js/live-wall-page.js"></script>
   <script src="js/broadcasts.js"></script>
   <script src="js/streams.js"></script>

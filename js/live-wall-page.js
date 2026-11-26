@@ -92,6 +92,23 @@
     });
   }
 
+  function forWall(list) {
+    var api = window.PulsePlayStreamFilters;
+    if (!api) return list || [];
+    return api.visibleStreams(list, null, { event: api.current(), showEnded: true });
+  }
+
+  function trackRows() {
+    var api = window.PulsePlayStreamFilters;
+    if (sampleMode || !api) return;
+    api.noteRows(rows);
+  }
+
+  function paintWallEvent() {
+    var api = window.PulsePlayStreamFilters;
+    if (api) api.paint(document.getElementById("wall-event"));
+  }
+
   function lockMute(player) {
     if (!player) return;
     try { if (player.mute) player.mute(); } catch (e) {}
@@ -439,7 +456,8 @@
   }
 
   function render() {
-    var live = sampleMode ? rows : rules.selectLive(rows, Date.now(), lifeById, convertStart);
+    var source = forWall(rows);
+    var live = sampleMode ? source : rules.selectLive(source, Date.now(), lifeById, convertStart);
     renderRows(live);
   }
 
@@ -535,6 +553,7 @@
         return;
       }
       rows = visibleRows(result.rows);
+      trackRows();
       if (rules.signature(rows, lifeById) !== lastSignature) {
         render();
         publishRows();
@@ -605,6 +624,7 @@
     }
     if (refetch) { fetchRows(); return; }
     rows = visibleRows(rules.applyChanges(rows, rules.coalesceChanges(changes)));
+    trackRows();
     render();
     if (window.PulsePlayTabs && window.PulsePlayTabs.isLeader()) publishRows();
   }
@@ -711,6 +731,12 @@
     var exit = document.getElementById("wall-exit-fs");
     if (document.body.getAttribute("data-wall-bound") === "1") return;
     document.body.setAttribute("data-wall-bound", "1");
+    if (window.PulsePlayStreamFilters) {
+      window.PulsePlayStreamFilters.onChange(function () {
+        paintWallEvent();
+        if (running) render();
+      });
+    }
     if (kiosk) kiosk.onclick = function () { setKiosk(!document.body.classList.contains("wall-kiosk")); };
     if (full) full.onclick = function () { enterFs(document.getElementById("wall-grid")); };
     if (sample) sample.onclick = function () { useSample(!sampleMode); };
@@ -751,6 +777,7 @@
         if (window.PulsePlayTabs.isLeader()) return;
         if (msg.signature && msg.signature === lastSignature) return;
         rows = visibleRows(msg.rows || []);
+        trackRows();
         lifeById = msg.lives || {};
         lastSignature = msg.signature || rules.signature(rows, lifeById);
         render();
@@ -794,6 +821,7 @@
       }
       acquireWake();
       startWatch();
+      paintWallEvent();
       if (sampleMode) {
         rows = rules.sampleRows();
         lifeById = {};
@@ -801,6 +829,7 @@
         return;
       }
       resumePlayers();
+      if (rows.length) render();
       openChannel();
       fetchRows();
     },
