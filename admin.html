@@ -48,6 +48,7 @@
       <div class="center-head">
         <h2>Streams</h2>
         <p id="streams-intro">Today and upcoming CricketCrazeUSA games. Start and End use the same YouTube connection as Broadcasts.</p>
+        <p class="hint">Each game shows its web overlay link for that ground and time of day. Copy uses the saved overlay URL when the row has one, otherwise the ground’s short link or renderer URL.</p>
       </div>
       <p id="streams-youtube" class="broadcast-notice is-off" role="status"></p>
       <div class="stream-filters">
@@ -184,7 +185,7 @@
     <section id="panel-center" class="is-off" aria-label="Command Center">
       <div class="center-head">
         <h2>Command Center</h2>
-        <p>One card per ground. The score strip iframes that ground's CricClubs overlay URL, the same <code>score_url</code> the renderer uses. Cards in an ad are highlighted. Click a card for its controls. A red <strong>Stuck</strong> badge means a video ad is past its length. An image ad that has been on for more than 10 minutes gets an informational badge; images stay until you switch them.</p>
+        <p>One card per ground. The web overlay link is that ground’s short link when one is saved. Copy it, or open it. Without a short link, the card uses the renderer URL, and a split ground (CTS West, Sycamore 2) lists the morning and afternoon links. The score strip iframes that ground's CricClubs overlay URL, the same <code>score_url</code> the renderer uses. Cards in an ad are highlighted. Click a card for its controls. A red <strong>Stuck</strong> badge means a video ad is past its length. An image ad that has been on for more than 10 minutes gets an informational badge; images stay until you switch them.</p>
         <p class="center-actions"><button type="button" id="btn-reset-stuck">Reset all stuck</button></p>
         <p class="hint" id="stuck-hint"></p>
       </div>
@@ -386,6 +387,7 @@
   <script src="js/supabase-store.js"></script>
   <script src="js/score-frame.js"></script>
   <script src="js/layout.js"></script>
+  <script src="js/psd-grounds.js"></script>
   <script src="js/overlay-target.js"></script>
   <script src="js/youtube-broadcasts.js"></script>
   <script src="js/stream-labels.js"></script>
