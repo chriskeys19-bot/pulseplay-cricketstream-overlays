@@ -199,6 +199,24 @@
     if (slot.style.getPropertyValue(name)) slot.style.removeProperty(name);
   }
 
+  /*
+   * Normalized layout.score.scale, clamped 0.25..2. Missing layout is 1,
+   * which is the slot-fit baseline for a full-size page.
+   */
+  function layoutScoreScale(ground) {
+    var raw;
+    var scale;
+    if (window.PulsePlayLayout && window.PulsePlayLayout.normalize) {
+      return window.PulsePlayLayout.normalize(ground && ground.layout).score.scale;
+    }
+    raw = ground && ground.layout && ground.layout.score;
+    scale = !raw || raw.scale == null || raw.scale === "" ? 1 : Number(raw.scale);
+    if (!isFinite(scale)) return 1;
+    if (scale < 0.25) return 0.25;
+    if (scale > 2) return 2;
+    return scale;
+  }
+
   function fitScore(ground) {
     var slot = document.getElementById("score-slot");
     var frame = document.getElementById("score-frame");
@@ -209,6 +227,7 @@
     var slotW;
     var slotH;
     var fit;
+    var scoreScale;
     var sx;
     var sy;
     var paint;
@@ -226,12 +245,18 @@
     /*
      * A full-size ccindex page is drawn in its own 1920×240 viewport so its
      * under-1800px rule does not push the overs row out of the frame. Scale
-     * that viewport down to the slot, from the bottom center. The slot's
-     * own scale and nudge stay on the slot. A compact bar still fills the
-     * slot and uses the 2.15 scale.
+     * that viewport to the slot width, from the bottom center. placeScore
+     * already shrinks the slot when scale is under the logo gap (about 0.85
+     * on a PSD ground) and will not widen it past that gap, so 1 is the
+     * 100% slot-fit baseline. A scale above 1 has to multiply this fit or
+     * 150% paints the same bar as 100%. The frame stays anchored at bottom
+     * center and the slot does not clip it. A compact bar still fills the
+     * slot and uses the 2.15 scale. Nudges stay on the slot.
      */
     if (view && view.width && slotW > 0) {
       fit = slotW / view.width;
+      scoreScale = layoutScoreScale(ground);
+      if (scoreScale > 1) fit = fit * scoreScale;
       setVar(slot, "--score-vw", view.width + "px");
       setVar(slot, "--score-vh", view.height + "px");
       setVar(slot, "--score-left", "50%");
