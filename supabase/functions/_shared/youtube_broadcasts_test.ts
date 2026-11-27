@@ -13,8 +13,11 @@ import {
   planStart,
   publicConnection,
   broadcastByIdUrl,
+  broadcastByIdsUrl,
   broadcastListUrl,
+  cleanBroadcastIds,
   listChannelBroadcasts,
+  readBroadcastHealth,
   readGoogleFailure,
   syncPlan,
   toClientBroadcast,
@@ -309,4 +312,54 @@ test('connection status for the browser omits the refresh token', () => {
   const ended = planEnd('complete')
   if (ended.kind === 'done') assert.match(ended.message, /already ended/)
   assert.equal(ALREADY_ENDED.length > 0, true)
+})
+
+test('health reads streamStatus and healthStatus without the ingest secret', async () => {
+  assert.deepEqual(cleanBroadcastIds(['abcdefghijk', 'bad', 'abcdefghijk', 'secondVideo1']), ['abcdefghijk', 'secondVideo1'])
+  const url = broadcastByIdsUrl(['abcdefghijk'])
+  assert.equal(new URL(url).searchParams.get('id'), 'abcdefghijk')
+  assert.equal(url.includes('mine='), false)
+  assert.equal(new URL(url).searchParams.get('broadcastStatus'), null)
+  const calls: string[] = []
+  const result = await readBroadcastHealth(
+    ['abcdefghijk', 'missingVideo1'],
+    caller((hit) => {
+      calls.push(hit)
+      if (hit.includes('/liveStreams')) {
+        return {
+          status: 200,
+          json: {
+            items: [{
+              id: STREAM,
+              snippet: { title: 'Yolobox Pro 1' },
+              status: {
+                streamStatus: 'active',
+                healthStatus: {
+                  status: 'noData',
+                  configurationIssues: [{
+                    severity: 'error',
+                    reason: 'noData',
+                    description: 'YouTube is not receiving data.',
+                  }],
+                },
+              },
+              cdn: { ingestionInfo: { streamName: 'super-secret-key' } },
+            }],
+          },
+        }
+      }
+      return { status: 200, json: { items: [apiBroadcast('live')] } }
+    }),
+    'ya29.access-token-value',
+  )
+  assert.equal(result.ok, true)
+  if (result.ok) {
+    assert.equal(result.rows[0]?.lifeCycle, 'live')
+    assert.equal(result.rows[0]?.streamStatus, 'active')
+    assert.equal(result.rows[0]?.healthStatus, 'noData')
+    assert.equal(result.rows[0]?.issues[0]?.description, 'YouTube is not receiving data.')
+    assert.equal(result.rows[1]?.lifeCycle, null)
+    assert.equal(JSON.stringify(result.rows).includes('super-secret-key'), false)
+  }
+  assert.equal(calls.length, 2)
 })

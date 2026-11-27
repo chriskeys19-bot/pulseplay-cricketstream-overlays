@@ -124,7 +124,7 @@ export function authorizeBroadcast(input: {
   rows: StreamRow[]
 }): { ok: true; videoId: string } | { ok: false; status: number; error: string } {
   const action = input.action
-  if (action !== 'status' && action !== 'list' && action !== 'test' && action !== 'start' && action !== 'end') {
+  if (action !== 'status' && action !== 'list' && action !== 'health' && action !== 'test' && action !== 'start' && action !== 'end') {
     return { ok: false, status: 400, error: 'Choose a broadcast action.' }
   }
   if (!input.caller.admin && input.caller.scopes) {

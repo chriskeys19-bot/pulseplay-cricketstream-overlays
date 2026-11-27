@@ -69,3 +69,9 @@ The refresh token is stored in `private.youtube_connections`. Row level security
 7. End always asks for confirmation.
 
 Do not start a real match broadcast while testing the button. Test connection is the safe check.
+
+## Stream health
+
+Command Center asks `youtube-broadcasts` for `action: "health"` with the broadcast ids linked on each ground. That reads `liveBroadcasts` and the bound `liveStreams` resource (`status.streamStatus`, `status.healthStatus.status`, and `configurationIssues`). It does not start or end a broadcast. The page repeats the check about every 25 seconds while Command Center is visible, and it waits while the browser tab is hidden.
+
+Redeploy `youtube-broadcasts` to project `lutcbvzunjcosncvdyke` after this change. No new Edge Function secrets are required. `verify_jwt` stays on.

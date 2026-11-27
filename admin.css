@@ -251,8 +251,50 @@ input[type="number"] { width: 120px; min-width: 120px; }
 .save-status.is-saving { color: #e4b75a; }
 .score-switch { margin: 16px 0; padding-top: 8px; border-top: 1px solid #31402d; }
 .score-switch .k { margin: 0; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: #e4b75a; }
-.score-switch-add label { display: block; margin: 8px 0; }
-.score-switch-add input { display: block; width: 100%; max-width: 640px; margin-top: 4px; }
+.score-switch-add label, .score-slot-row label { display: block; margin: 8px 0; color: #c5cebb; font-size: 13px; font-weight: 700; }
+.score-switch-add input, .score-switch-add select, .score-slot-row input, .score-slot-row select { display: block; width: 100%; max-width: 640px; margin-top: 4px; }
+.score-slot-row { margin: 0 0 14px; padding: 10px 0; border-bottom: 1px solid #31402d; }
+.score-slot-row button, .btn-next-game, .card__switch button, .card__ads {
+  font-weight: 700;
+  padding: 14px 16px;
+  margin: 8px 8px 0 0;
+  border: 2px solid #e4b75a;
+  border-radius: 8px;
+  background: transparent;
+  color: #f6f3ea;
+  cursor: pointer;
+  min-height: 44px;
+}
+.score-slot-row button[aria-pressed="true"] { background: #e4b75a; color: #2a210c; }
+.switch-status, .card__switch-status { white-space: pre-line; margin: 8px 0; color: #f6f3ea; font-size: 14px; }
+.card__health {
+  clear: both;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+.card__health--good { background: #1f7a3a; color: #fff; }
+.card__health--warn { background: #8a5a00; color: #fff; }
+.card__health--bad { background: #9f1239; color: #fff; animation: stream-pulse 1s ease-in-out infinite; }
+.card__health--muted { background: #2a3328; color: #b7c2ae; text-transform: none; font-weight: 700; letter-spacing: 0; }
+.card__health-detail { display: block; margin-top: 2px; font-weight: 600; letter-spacing: 0; text-transform: none; font-size: 13px; }
+.card__scoreline { margin: 8px 0 0; font-weight: 700; }
+.card__alert { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; font-weight: 800; }
+.card__alert--soon { background: #8a5a00; color: #fff; }
+.card__alert--break { background: #e4b75a; color: #2a210c; font-size: 16px; }
+.card--break { outline: 3px solid #e4b75a; }
+.card__ads { display: block; margin-top: 8px; background: #2a210c; color: #e4b75a; }
+@keyframes stream-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card__health--bad { animation: none; }
+}
 .logo-fields { margin: 8px 0 16px; }
 .logo-fields > div {
   display: inline-block;

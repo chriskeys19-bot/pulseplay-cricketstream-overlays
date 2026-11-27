@@ -127,6 +127,21 @@
         "spot-1",
         "spot-2"
       ],
+      "score_overlays": [
+        {
+          "id": "cheetahs-home-am",
+          "name": "AM Game",
+          "url": "scores/board.html?batting=Cheetahs&bowling=Deccan&score=186%2F4&overs=32.1&rr=5.78",
+          "active": true
+        },
+        {
+          "id": "cheetahs-home-pm",
+          "name": "PM Game",
+          "url": "scores/board.html?batting=Cheetahs&bowling=Hawks&score=42%2F1&overs=6.2&rr=6.70",
+          "active": false,
+          "logo_age_id": "logo-tournament"
+        }
+      ],
       "updated_at": "2026-11-19T15:00:00Z"
     },
     {

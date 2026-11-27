@@ -51,6 +51,8 @@ test('a tournament admin can start every division in that tournament only', () =
   if (!outside.ok) assert.equal(outside.status, 403)
   const list = authorizeBroadcast({ caller: tournamentAdmin, action: 'list', requestedId: '', rows: [] })
   assert.equal(list.ok, true)
+  const health = authorizeBroadcast({ caller: tournamentAdmin, action: 'health', requestedId: '', rows: [] })
+  assert.equal(health.ok, true)
   const testConn = authorizeBroadcast({ caller: tournamentAdmin, action: 'test', requestedId: '', rows: [] })
   assert.equal(testConn.ok, false)
 })
@@ -65,6 +67,8 @@ test('an age-group operator is limited to that division and tournament', () => {
   const list = authorizeBroadcast({ caller: ageOperator, action: 'list', requestedId: '', rows: [] })
   assert.equal(list.ok, false)
   if (!list.ok) assert.match(list.error, /own division/)
+  const health = authorizeBroadcast({ caller: ageOperator, action: 'health', requestedId: '', rows: [] })
+  assert.equal(health.ok, false)
 })
 
 test('an age-group operator with no tournament covers that age group everywhere', () => {

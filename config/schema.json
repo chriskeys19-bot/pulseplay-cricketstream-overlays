@@ -177,9 +177,9 @@
           "minLength": 1,
           "description": "CricClubs overlay URL currently on air. The renderer and Command Center both iframe this field. It matches the active entry in score_overlays."
         },
-        "score_overlays": {
+          "score_overlays": {
           "type": "array",
-          "description": "Named score URLs for this ground. One tap in Ground controls marks one active and copies its url into score_url.",
+          "description": "Named score URLs for this ground, in play order. One tap marks one active and copies its url into score_url. logo_age_id and youtube_broadcast_id are optional.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -192,6 +192,16 @@
               "full_size": {
                 "type": "boolean",
                 "description": "True when this score page already draws a full-size bar (1x). False forces the compact 2.15 scale used for overlay.cricclubs.com. Omit it to decide from the host."
+              },
+              "logo_age_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional age-group sponsor asset. Applied to the ground when this slot becomes the live score."
+              },
+              "youtube_broadcast_id": {
+                "type": "string",
+                "minLength": 6,
+                "description": "Optional YouTube broadcast id for this slot. Used by the one-tap game switch and the stream health pill."
               }
             }
           }

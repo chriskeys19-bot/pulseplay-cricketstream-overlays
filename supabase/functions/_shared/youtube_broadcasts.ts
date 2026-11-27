@@ -93,7 +93,48 @@ export function parseBroadcastPage(body: unknown): { items: ParsedBroadcast[]; n
   return { items, nextPageToken: token }
 }
 
-export type StreamLabel = { title: string | null; ingest: string | null }
+export type StreamIssue = { severity: string; reason: string; description: string }
+
+export type StreamLabel = {
+  title: string | null
+  ingest: string | null
+  healthStatus: string | null
+  issues: StreamIssue[]
+}
+
+export type BroadcastHealth = {
+  id: string
+  lifeCycle: string | null
+  boundStreamId: string | null
+  streamStatus: string | null
+  healthStatus: string | null
+  issues: StreamIssue[]
+}
+
+function streamIssues(status: Record<string, unknown>): StreamIssue[] {
+  const health = status.healthStatus
+  if (!health || typeof health !== 'object') return []
+  const issues = (health as { configurationIssues?: unknown }).configurationIssues
+  if (!Array.isArray(issues)) return []
+  const out: StreamIssue[] = []
+  for (const item of issues) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const description = text(row.description, 180) || ''
+    const reason = text(row.reason, 80) || ''
+    const severity = text(row.severity, 20) || ''
+    if (!description && !reason) continue
+    out.push({ severity, reason, description })
+    if (out.length >= 4) break
+  }
+  return out
+}
+
+function healthStatusOf(status: Record<string, unknown>): string | null {
+  const health = status.healthStatus
+  if (!health || typeof health !== 'object') return null
+  return text((health as { status?: unknown }).status, 40)
+}
 
 export function parseStreamLabels(body: unknown): Map<string, StreamLabel> {
   const labels = new Map<string, StreamLabel>()
@@ -106,13 +147,36 @@ export function parseStreamLabels(body: unknown): Map<string, StreamLabel> {
     const id = text(row.id, 64)
     if (!id) continue
     const snippet = row.snippet && typeof row.snippet === 'object' ? (row.snippet as { title?: unknown }) : {}
-    const status = row.status && typeof row.status === 'object' ? (row.status as { streamStatus?: unknown }) : {}
+    const status = row.status && typeof row.status === 'object' ? (row.status as Record<string, unknown>) : {}
     labels.set(id, {
       title: text(snippet.title, 80),
       ingest: text(status.streamStatus, 40),
+      healthStatus: healthStatusOf(status),
+      issues: streamIssues(status),
     })
   }
   return labels
+}
+
+export function cleanBroadcastIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const out: string[] = []
+  for (const item of value) {
+    if (typeof item !== 'string') continue
+    const id = item.trim()
+    if (!VIDEO_ID.test(id) || out.includes(id)) continue
+    out.push(id)
+    if (out.length >= 40) break
+  }
+  return out
+}
+
+export function broadcastByIdsUrl(ids: string[]): string {
+  const url = new URL(`${YOUTUBE_API}/liveBroadcasts`)
+  url.searchParams.set('part', 'id,snippet,status,contentDetails')
+  url.searchParams.set('id', ids.join(','))
+  url.searchParams.set('maxResults', '50')
+  return url.toString()
 }
 
 export type StartPlan =
@@ -606,6 +670,48 @@ export async function listChannelBroadcasts(
       if (!parsed.nextPageToken) break
       pageToken = parsed.nextPageToken
     }
+  }
+  return { ok: true, rows }
+}
+
+export async function readBroadcastHealth(
+  ids: string[],
+  call: YoutubeCaller,
+  token: string,
+): Promise<{ ok: true; rows: BroadcastHealth[] } | { ok: false; message: string; reconnect: boolean }> {
+  const wanted = cleanBroadcastIds(ids)
+  if (wanted.length === 0) return { ok: true, rows: [] }
+  const broadcasts = new Map<string, ParsedBroadcast>()
+  for (let index = 0; index < wanted.length; index += 50) {
+    const slice = wanted.slice(index, index + 50)
+    const response = await call({ url: broadcastByIdsUrl(slice), method: 'GET', token })
+    const failure = readGoogleFailure(response.status, response.json, 'list')
+    if (failure) return { ok: false, message: failure.message, reconnect: needsReconnect(failure) }
+    for (const item of parseBroadcastPage(response.json).items) broadcasts.set(item.id, item)
+  }
+  const boundIds = [...new Set(
+    [...broadcasts.values()].map((row) => row.boundStreamId).filter((id): id is string => Boolean(id)),
+  )]
+  const labels = new Map<string, StreamLabel>()
+  for (let index = 0; index < boundIds.length; index += 50) {
+    const slice = boundIds.slice(index, index + 50)
+    const response = await call({ url: streamStatusUrl(slice), method: 'GET', token })
+    const failure = readGoogleFailure(response.status, response.json, 'list')
+    if (failure) return { ok: false, message: failure.message, reconnect: needsReconnect(failure) }
+    for (const [id, label] of parseStreamLabels(response.json)) labels.set(id, label)
+  }
+  const rows: BroadcastHealth[] = []
+  for (const id of wanted) {
+    const row = broadcasts.get(id)
+    const label = row?.boundStreamId ? labels.get(row.boundStreamId) : undefined
+    rows.push({
+      id,
+      lifeCycle: row?.lifeCycle ?? null,
+      boundStreamId: row?.boundStreamId ?? null,
+      streamStatus: label?.ingest ?? null,
+      healthStatus: label?.healthStatus ?? null,
+      issues: label?.issues ?? [],
+    })
   }
   return { ok: true, rows }
 }
