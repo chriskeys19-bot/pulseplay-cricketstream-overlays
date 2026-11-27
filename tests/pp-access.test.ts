@@ -37,6 +37,8 @@ test('an operator cannot start another division, a missing stream, or the full l
   const list = authorizeBroadcast({ caller: operator, action: 'list', requestedId: '', rows: [] })
   assert.equal(list.ok, false)
   if (!list.ok) assert.match(list.error, /own division/)
+  const health = authorizeBroadcast({ caller: operator, action: 'health', requestedId: '', rows: [] })
+  assert.equal(health.ok, false)
   const shared = authorizeBroadcast({
     caller: operator,
     action: 'start',
@@ -85,6 +87,8 @@ test('an admin can start a stream id or a broadcast that is not in the table', (
   if (loose.ok) assert.equal(loose.videoId, 'abcdefghijk')
   const list = authorizeBroadcast({ caller: { admin: true }, action: 'list', requestedId: '', rows: [] })
   assert.equal(list.ok, true)
+  const health = authorizeBroadcast({ caller: { admin: true }, action: 'health', requestedId: '', rows: [] })
+  assert.equal(health.ok, true)
 })
 
 test('one person can hold more than one division', () => {

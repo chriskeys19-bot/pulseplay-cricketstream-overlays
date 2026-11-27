@@ -9,8 +9,10 @@ import {
   RECONNECT_MESSAGE,
   executeEnd,
   executeStart,
+  cleanBroadcastIds,
   listChannelBroadcasts,
   publicConnection,
+  readBroadcastHealth,
   syncPlan,
   testChannelConnection,
   toClientBroadcast,
@@ -121,10 +123,10 @@ Deno.serve(async (req: Request) => {
 
   const text = await req.text()
   if (text.length > 4000) return respond(413, { error: 'That request is too large.' })
-  let body: { action?: unknown; broadcastId?: unknown; streamId?: unknown } = {}
+  let body: { action?: unknown; broadcastId?: unknown; streamId?: unknown; broadcastIds?: unknown } = {}
   if (text.trim()) {
     try {
-      body = JSON.parse(text) as { action?: unknown; broadcastId?: unknown; streamId?: unknown }
+      body = JSON.parse(text) as { action?: unknown; broadcastId?: unknown; streamId?: unknown; broadcastIds?: unknown }
     } catch {
       return respond(400, { error: 'Send JSON.' })
     }
@@ -231,6 +233,27 @@ Deno.serve(async (req: Request) => {
       broadcasts = broadcastsInScope(caller, broadcasts, streams)
     }
     return respond(200, { connection: liveConnection, broadcasts })
+  }
+
+  if (action === 'health') {
+    const ids = cleanBroadcastIds(body.broadcastIds)
+    if (ids.length === 0) {
+      return respond(200, { ok: true, checkedAt: new Date().toISOString(), broadcasts: [], connection: liveConnection })
+    }
+    const health = await readBroadcastHealth(ids, call, refreshed.accessToken)
+    if (!health.ok) {
+      if (health.reconnect) {
+        await admin.rpc('youtube_connection_mark_error', { p_message: 'YouTube rejected the access token.' })
+        return respond(409, { error: health.message, connection: shownConnection(stored, 'expired') })
+      }
+      return respond(502, { error: health.message, connection: liveConnection })
+    }
+    return respond(200, {
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      broadcasts: health.rows,
+      connection: liveConnection,
+    })
   }
 
   const id = decision.videoId

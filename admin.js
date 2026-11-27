@@ -344,14 +344,13 @@
     var node = document.getElementById("stuck-hint");
     var list;
     var n;
-    if (!node) return;
-    list = stuckGrounds(currentDoc);
-    n = list.length;
-    if (!n) {
-      setText(node, "");
-      return;
+    if (node) {
+      list = stuckGrounds(currentDoc);
+      n = list.length;
+      if (!n) setText(node, "");
+      else setText(node, n + " ground" + (n === 1 ? " is" : "s are") + " marked stuck. Video ads past their length, or any ad on for more than 10 minutes, can be reset here. Image ads are not cleared automatically.");
     }
-    setText(node, n + " ground" + (n === 1 ? " is" : "s are") + " marked stuck. Video ads past their length, or any ad on for more than 10 minutes, can be reset here. Image ads are not cleared automatically.");
+    if (window.PulsePlayCommand) window.PulsePlayCommand.paint();
   }
 
   function resolvedFor(id) {
@@ -449,46 +448,8 @@
   }
 
   function scoreList(ground) {
-    var raw = ground && ground.score_overlays;
-    var out = [];
-    var i;
-    var item;
-    var activeAt = -1;
-    if (raw && raw.length) {
-      for (i = 0; i < raw.length; i++) {
-        item = raw[i];
-        if (!item || !item.url) continue;
-        var saved = {
-          id: String(item.id || ((ground.id || "ground") + "-score-" + (i + 1))),
-          name: String(item.name || ("Game " + (out.length + 1))),
-          url: String(item.url).replace(/^\s+|\s+$/g, ""),
-          active: item.active === true
-        };
-        if (item.full_size === true) saved.full_size = true;
-        else if (item.full_size === false) saved.full_size = false;
-        out.push(saved);
-      }
-    }
-    if (!out.length && ground && ground.score_url) {
-      out.push({
-        id: (ground.id || "ground") + "-game-1",
-        name: "Game 1",
-        url: ground.score_url,
-        active: true
-      });
-    }
-    for (i = 0; i < out.length; i++) {
-      if (out[i].active && activeAt === -1) activeAt = i;
-      else out[i].active = false;
-    }
-    if (activeAt === -1 && out.length) {
-      for (i = 0; i < out.length; i++) {
-        if (ground && out[i].url === ground.score_url) { activeAt = i; break; }
-      }
-      if (activeAt === -1) activeAt = 0;
-      out[activeAt].active = true;
-    }
-    return out;
+    if (!window.PulsePlayGameSwitch) return [];
+    return window.PulsePlayGameSwitch.scoreList(ground);
   }
 
   function scoreWarnText(url) {
@@ -497,16 +458,91 @@
   }
 
   var scoreSwitchSig = "";
+  var gameSwitchBusy = "";
+
+  function logoAssetSig() {
+    var logos = assetsOf("logo");
+    var parts = [];
+    var i;
+    for (i = 0; i < logos.length; i++) parts.push(logos[i].id + ":" + logos[i].label);
+    return parts.join("|");
+  }
+
+  function paintNextGame(ground) {
+    var box = document.getElementById("score-next");
+    var rules = window.PulsePlayGameSwitch;
+    var list;
+    var current;
+    var next;
+    var button;
+    if (!box) return;
+    clear(box);
+    if (!ground || !rules) return;
+    list = rules.scoreList(ground);
+    current = rules.activeSlot(list);
+    next = rules.nextSlot(list);
+    if (!next) return;
+    button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn-next-game";
+    setText(button, rules.buttonLabel(current, next));
+    button.disabled = gameSwitchBusy === ground.id;
+    button.onclick = function () { runGameSwitch(ground.id); };
+    box.appendChild(button);
+  }
+
+  function appendScoreRow(listEl, slot) {
+    var row = document.createElement("div");
+    var button = document.createElement("button");
+    var logoLabel = document.createElement("label");
+    var logoSelect = document.createElement("select");
+    var ytLabel = document.createElement("label");
+    var ytInput = document.createElement("input");
+    var pickLabel = document.createElement("label");
+    var pick = document.createElement("select");
+    var save = document.createElement("button");
+    row.className = "score-slot-row";
+    button.type = "button";
+    button.setAttribute("data-score-id", slot.id);
+    button.setAttribute("aria-pressed", slot.active ? "true" : "false");
+    setText(button, slot.name + (slot.active ? " · on air" : ""));
+    button.onclick = function () { showSavedScore(slot.id); };
+    logoLabel.appendChild(document.createTextNode("Division logo"));
+    logoLabel.appendChild(logoSelect);
+    fillLogoSelect(logoSelect, "age_group_sponsor", slot.logo_age_id || "");
+    ytLabel.appendChild(document.createTextNode("YouTube broadcast"));
+    ytInput.type = "text";
+    ytInput.value = slot.youtube_broadcast_id || "";
+    ytInput.setAttribute("placeholder", "Video id or youtube.com/watch?v=");
+    ytLabel.appendChild(ytInput);
+    pickLabel.appendChild(document.createTextNode("Upcoming"));
+    pick.className = "score-yt-pick";
+    pickLabel.appendChild(pick);
+    pick.onchange = function () { if (pick.value) ytInput.value = pick.value; };
+    if (window.PulsePlayCommand) window.PulsePlayCommand.fillPick(pick);
+    save.type = "button";
+    setText(save, "Save slot");
+    save.onclick = function () { saveScoreSlot(slot.id, logoSelect.value, ytInput.value); };
+    row.appendChild(button);
+    row.appendChild(logoLabel);
+    row.appendChild(ytLabel);
+    row.appendChild(pickLabel);
+    row.appendChild(save);
+    listEl.appendChild(row);
+  }
 
   function renderScoreSwitch(ground) {
     var box = document.getElementById("score-switch");
     var listEl = document.getElementById("score-switch-list");
     var warn = document.getElementById("score-switch-warn");
+    var addLogo = document.getElementById("score-switch-logo");
     var list;
     var sig;
     var i;
-    var button;
     var activeUrl = "";
+    var typed;
+    var warnText;
+    var previousLogo;
     if (!box || !listEl) return;
     if (!ground) {
       box.classList.add("is-off");
@@ -515,25 +551,28 @@
     }
     box.classList.remove("is-off");
     list = scoreList(ground);
-    sig = ground.id + "|" + JSON.stringify(list);
-    if (sig !== scoreSwitchSig) {
+    paintNextGame(ground);
+    sig = ground.id + "|" + JSON.stringify(list) + "|" + logoAssetSig() + "|" + (gameSwitchBusy === ground.id ? "1" : "0");
+    if (!listEl.contains(document.activeElement) && sig !== scoreSwitchSig) {
       scoreSwitchSig = sig;
       clear(listEl);
       for (i = 0; i < list.length; i++) {
-        button = document.createElement("button");
-        button.type = "button";
-        button.setAttribute("data-score-id", list[i].id);
-        button.setAttribute("aria-pressed", list[i].active ? "true" : "false");
-        setText(button, list[i].name);
-        button.onclick = function () { showSavedScore(this.getAttribute("data-score-id")); };
-        listEl.appendChild(button);
+        appendScoreRow(listEl, list[i]);
         if (list[i].active) activeUrl = list[i].url;
       }
     } else {
       for (i = 0; i < list.length; i++) if (list[i].active) activeUrl = list[i].url;
     }
-    var typed = document.getElementById("score-switch-url").value.replace(/^\s+|\s+$/g, "");
-    var warnText = scoreWarnText(typed || activeUrl);
+    if (addLogo && document.activeElement !== addLogo) {
+      previousLogo = addLogo.value;
+      if (addLogo.getAttribute("data-sig") !== logoAssetSig()) {
+        fillLogoSelect(addLogo, "age_group_sponsor", previousLogo);
+        addLogo.setAttribute("data-sig", logoAssetSig());
+      }
+    }
+    if (window.PulsePlayCommand) window.PulsePlayCommand.fillPick(document.getElementById("score-switch-youtube-pick"));
+    typed = document.getElementById("score-switch-url").value.replace(/^\s+|\s+$/g, "");
+    warnText = scoreWarnText(typed || activeUrl);
     setText(warn, warnText);
     if (warnText) warn.classList.add("is-warn");
     else warn.classList.remove("is-warn");
@@ -559,18 +598,12 @@
 
   function showSavedScore(scoreId) {
     var ground = findGround(currentDoc, currentId);
-    var list;
-    var i;
-    var chosen = null;
-    if (!ground || !scoreId) return;
-    list = scoreList(ground);
-    for (i = 0; i < list.length; i++) {
-      list[i].active = list[i].id === scoreId;
-      if (list[i].active) chosen = list[i];
-    }
-    if (!chosen) return;
+    var fields;
+    if (!ground || !scoreId || !window.PulsePlayGameSwitch) return;
+    fields = window.PulsePlayGameSwitch.fieldsFor(ground, scoreId);
+    if (!fields) return;
     /* Leave updated_at alone so an in-flight video return timer still matches. */
-    patch(ground.id, { score_url: chosen.url, score_overlays: list }, { keepUpdatedAt: true });
+    patch(ground.id, fields, { keepUpdatedAt: true });
   }
 
   function addScoreOverlay() {
@@ -584,7 +617,13 @@
     var n;
     var reused = false;
     var fullSize;
-    if (!ground) return;
+    var slot = null;
+    var meta;
+    var fields;
+    var logos;
+    var logoInput;
+    var youtubeInput;
+    if (!ground || !window.PulsePlayGameSwitch) return;
     if (!name || !url) {
       showBanner("Give the score overlay a name and a URL.");
       return;
@@ -604,15 +643,204 @@
         list[i].name = name;
         list[i].full_size = fullSize;
         list[i].active = true;
+        slot = list[i];
         reused = true;
       } else list[i].active = false;
     }
-    if (!reused) list.push({ id: id, name: name, url: url, active: true, full_size: fullSize });
+    if (!reused) {
+      slot = { id: id, name: name, url: url, active: true, full_size: fullSize };
+      list.push(slot);
+    }
+    logoInput = document.getElementById("score-switch-logo");
+    youtubeInput = document.getElementById("score-switch-youtube");
+    meta = window.PulsePlayGameSwitch.assignSlotMeta(slot, logoInput ? logoInput.value : "", youtubeInput ? youtubeInput.value : "");
+    if (!meta.ok) {
+      showBanner(meta.message);
+      return;
+    }
+    fields = { score_url: url, score_overlays: list };
+    logos = window.PulsePlayGameSwitch.withLogo(ground, slot.logo_age_id);
+    if (logos) fields.logos = logos;
     document.getElementById("score-switch-name").value = "";
     document.getElementById("score-switch-url").value = "";
+    if (youtubeInput) youtubeInput.value = "";
+    if (logoInput) logoInput.value = "";
     scoreFullTouched = false;
+    scoreSwitchSig = "";
     refreshScoreSwitchDraftWarn();
-    patch(ground.id, { score_url: url, score_overlays: list }, { keepUpdatedAt: true });
+    patch(ground.id, fields, { keepUpdatedAt: true });
+  }
+
+  function saveScoreSlot(scoreId, logoRaw, youtubeRaw) {
+    var ground = findGround(currentDoc, currentId);
+    var list;
+    var i;
+    var slot = null;
+    var meta;
+    var fields;
+    var logos;
+    if (!ground || !window.PulsePlayGameSwitch) return;
+    list = scoreList(ground);
+    for (i = 0; i < list.length; i++) if (list[i].id === scoreId) slot = list[i];
+    if (!slot) return;
+    meta = window.PulsePlayGameSwitch.assignSlotMeta(slot, logoRaw, youtubeRaw);
+    if (!meta.ok) {
+      showBanner(meta.message);
+      return;
+    }
+    fields = { score_overlays: list };
+    if (slot.active) {
+      logos = window.PulsePlayGameSwitch.withLogo(ground, slot.logo_age_id);
+      if (logos) fields.logos = logos;
+    }
+    scoreSwitchSig = "";
+    patch(ground.id, fields, { keepUpdatedAt: true });
+  }
+
+  function logoName(id) {
+    var asset = findAsset(currentDoc, id);
+    return asset && asset.label ? asset.label : id;
+  }
+
+  function liveVideoForGround(ground) {
+    var streams = window.PulsePlayAccessStreams || [];
+    var i;
+    var row;
+    var status;
+    if (!ground || !window.PulsePlayScope || !window.PulsePlayScope.groundMatches) return "";
+    for (i = 0; i < streams.length; i++) {
+      row = streams[i];
+      if (!window.PulsePlayScope.groundMatches(ground, row)) continue;
+      status = String(row && row.status || "").toLowerCase();
+      if (status === "live" && row.video_id) return String(row.video_id);
+    }
+    return "";
+  }
+
+  function youtubeInvoke(body) {
+    var client = window.PulsePlaySupabase && window.PulsePlaySupabase.get ? window.PulsePlaySupabase.get() : null;
+    if (!client || !client.functions) {
+      return Promise.resolve({ error: "Sign in on the live admin site to change a YouTube broadcast." });
+    }
+    return client.functions.invoke("youtube-broadcasts", { body: body }).then(function (result) {
+      var context;
+      if (!result.error) return { data: result.data };
+      context = result.error.context;
+      if (context && context.json) {
+        return context.json().then(function (payload) {
+          return { error: payload && payload.error ? payload.error : "YouTube could not complete that request." };
+        }).catch(function () {
+          return { error: "YouTube could not complete that request." };
+        });
+      }
+      return { error: result.error.message || "YouTube could not complete that request." };
+    });
+  }
+
+  function setSwitchStatus(groundId, text) {
+    var status = document.getElementById("score-switch-status");
+    var cards;
+    var i;
+    var node;
+    if (status && currentId === groundId) setText(status, text);
+    cards = document.getElementsByClassName("card");
+    for (i = 0; i < cards.length; i++) {
+      if (cards[i].getAttribute("data-id") !== groundId) continue;
+      node = childByClass(cards[i], "card__switch-status");
+      setText(node, text);
+    }
+  }
+
+  function runGameSwitch(groundId) {
+    var rules = window.PulsePlayGameSwitch;
+    var ground = findGround(currentDoc, groundId);
+    var list;
+    var current;
+    var next;
+    var plan;
+    var lines;
+    if (!ground || !rules || gameSwitchBusy) return;
+    list = rules.scoreList(ground);
+    current = rules.activeSlot(list);
+    next = rules.nextSlot(list);
+    if (!next) return;
+    if (!window.confirm(rules.confirmText(ground.name, current, next, logoName(next.logo_age_id)))) return;
+    gameSwitchBusy = groundId;
+    plan = rules.switchPlan(current, next, liveVideoForGround(ground));
+    lines = [];
+    setSwitchStatus(groundId, "1. Ending the current YouTube broadcast…");
+    renderScoreSwitch(ground);
+    syncCardSwitch(cardById(groundId), ground);
+    (plan.endId ? youtubeInvoke({ action: "end", broadcastId: plan.endId }) : Promise.resolve({ skipped: true, message: "No AM broadcast is linked or live." }))
+      .then(function (result) {
+        if (result.skipped) {
+          lines.push("1. Skipped: " + result.message);
+          return "go";
+        }
+        if (result.error) {
+          if (rules.endIsSkippable(result.error) || rules.endCanContinue(result.error)) {
+            lines.push("1. " + (rules.endIsSkippable(result.error) ? "Skipped: " : "Needs attention: ") + result.error);
+            return "go";
+          }
+          lines.push("1. Needs attention: " + result.error);
+          lines.push("2. Not run. The score overlay is still the current game.");
+          lines.push("3. Not run.");
+          return "stop";
+        }
+        lines.push("1. Done: " + ((result.data && result.data.message) || "The AM broadcast has ended."));
+        return "go";
+      })
+      .then(function (gate) {
+        var fields;
+        if (gate !== "go") return "stop";
+        setSwitchStatus(groundId, lines.concat(["2. Switching the score overlay…"]).join("\n"));
+        fields = rules.fieldsFor(findGround(currentDoc, groundId), next.id);
+        if (!fields) {
+          lines.push("2. Needs attention: That game is no longer on this ground.");
+          lines.push("3. Not run.");
+          return "stop";
+        }
+        return new Promise(function (resolve) {
+          patch(groundId, fields, {
+            keepUpdatedAt: true,
+            onSaved: function (err) {
+              if (err) {
+                lines.push("2. Needs attention: " + (err.message || "The score overlay did not save."));
+                lines.push("3. Not run.");
+                resolve("stop");
+                return;
+              }
+              lines.push("2. Done: " + next.name + " is the score on the YoloBox.");
+              resolve("go");
+            }
+          });
+        });
+      })
+      .then(function (gate) {
+        if (gate !== "go") return;
+        if (!plan.startId) {
+          lines.push("3. Skipped: No PM broadcast is linked.");
+          return;
+        }
+        setSwitchStatus(groundId, lines.concat(["3. Starting the next YouTube broadcast…"]).join("\n"));
+        return youtubeInvoke({ action: "start", broadcastId: plan.startId }).then(function (result) {
+          if (result.error) lines.push("3. Needs attention: " + result.error);
+          else lines.push("3. Done: " + ((result.data && result.data.message) || "The PM broadcast is live."));
+        });
+      })
+      .then(function () {
+        gameSwitchBusy = "";
+        scoreSwitchSig = "";
+        setSwitchStatus(groundId, lines.join("\n"));
+        renderScoreSwitch(findGround(currentDoc, currentId));
+        renderCenter();
+      })
+      .catch(function () {
+        gameSwitchBusy = "";
+        scoreSwitchSig = "";
+        setSwitchStatus(groundId, "The switch stopped before it finished. Check the broadcast and the score overlay, then try again.");
+        renderScoreSwitch(findGround(currentDoc, currentId));
+      });
   }
 
   function refreshScoreSwitchDraftWarn() {
@@ -753,7 +981,7 @@
 
   function isLinkTarget(node) {
     while (node && node !== document) {
-      if (node.tagName === "A" || node.tagName === "BUTTON" || node.tagName === "INPUT") return true;
+      if (node.tagName === "A" || node.tagName === "BUTTON" || node.tagName === "INPUT" || node.tagName === "SELECT" || node.tagName === "LABEL") return true;
       node = node.parentNode;
     }
     return false;
@@ -886,6 +1114,45 @@
     syncCardStill(card, ground);
     syncCardScore(card, ground);
     syncCardOverlay(card, ground);
+    syncCardSwitch(card, ground);
+  }
+
+  function cardById(id) {
+    var cards = document.getElementsByClassName("card");
+    var i;
+    for (i = 0; i < cards.length; i++) {
+      if (cards[i].getAttribute("data-id") === id) return cards[i];
+    }
+    return null;
+  }
+
+  function syncCardSwitch(card, ground) {
+    var box = card ? childByClass(card, "card__switch") : null;
+    var rules = window.PulsePlayGameSwitch;
+    var list;
+    var current;
+    var next;
+    var button;
+    var sig;
+    if (!box || !ground || !rules) return;
+    list = rules.scoreList(ground);
+    current = rules.activeSlot(list);
+    next = rules.nextSlot(list);
+    sig = (next ? next.id + ":" + rules.buttonLabel(current, next) : "") + ":" + (gameSwitchBusy === ground.id ? "1" : "0");
+    if (box.getAttribute("data-sig") === sig) return;
+    box.setAttribute("data-sig", sig);
+    clear(box);
+    if (!next) return;
+    button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn-next-game";
+    setText(button, rules.buttonLabel(current, next));
+    button.disabled = gameSwitchBusy === ground.id;
+    button.onclick = function (event) {
+      if (event.stopPropagation) event.stopPropagation();
+      runGameSwitch(ground.id);
+    };
+    box.appendChild(button);
   }
 
   function overlayLine(label, url) {
@@ -1035,6 +1302,14 @@
     scoreP.appendChild(document.createTextNode("Score URL: "));
     scoreP.appendChild(scoreA);
     var reset = document.createElement("button");
+    var health = document.createElement("p");
+    var healthLabel = document.createElement("span");
+    var healthDetail = document.createElement("span");
+    var live = document.createElement("div");
+    var scoreline = document.createElement("p");
+    var alert = document.createElement("p");
+    var switchBox = document.createElement("div");
+    var switchStatus = document.createElement("p");
     reset.type = "button";
     reset.className = "card__reset is-off";
     setText(reset, "Logos + Score");
@@ -1043,6 +1318,25 @@
       resetGroundToLogos(ground.id);
     };
     card.appendChild(head);
+    health.className = "card__health card__health--muted";
+    health.setAttribute("role", "status");
+    healthLabel.className = "card__health-label";
+    healthDetail.className = "card__health-detail is-off";
+    setText(healthLabel, "No broadcast");
+    health.appendChild(healthLabel);
+    health.appendChild(healthDetail);
+    live.className = "card__livebox";
+    scoreline.className = "card__scoreline";
+    alert.className = "card__alert is-off";
+    live.appendChild(scoreline);
+    live.appendChild(alert);
+    switchBox.className = "card__switch";
+    switchStatus.className = "card__switch-status";
+    switchStatus.setAttribute("role", "status");
+    card.appendChild(health);
+    card.appendChild(live);
+    card.appendChild(switchBox);
+    card.appendChild(switchStatus);
     card.appendChild(mode);
     card.appendChild(reset);
     card.appendChild(overlays);
@@ -1738,7 +2032,7 @@
   }
 
   function fillLogoSelect(selectId, preferred, selectedId) {
-    var select = document.getElementById(selectId);
+    var select = typeof selectId === "string" ? document.getElementById(selectId) : selectId;
     var logos = assetsOf("logo");
     var match = document.createElement("optgroup");
     var rest = document.createElement("optgroup");
@@ -1830,6 +2124,10 @@
     if (main === "access" && window.PulsePlayAccessTab) window.PulsePlayAccessTab.show();
     if (main === "wall" && window.PulsePlayLiveWall) window.PulsePlayLiveWall.show();
     else if (window.PulsePlayLiveWall) window.PulsePlayLiveWall.hide();
+    if (window.PulsePlayCommand) {
+      if (main === "setup" && setupSection === "controls") window.PulsePlayCommand.loadBroadcasts();
+      window.PulsePlayCommand.sync();
+    }
   }
 
   function setTabState(id, on) {
@@ -1905,14 +2203,16 @@
     window.PulsePlayStreams.show();
   }
 
-  function saveDoc(hint) {
+  function saveDoc(hint, done) {
     if (!isFullAdmin()) {
       showBanner("That change is for a full Pulse Play admin.");
+      if (done) done(new Error("That change is for a full Pulse Play admin."));
       return;
     }
     store.write(currentDoc, function (err) {
       if (err) {
         showBanner(err.message || "Could not save.");
+        if (done) done(err);
         return;
       }
       showBanner("");
@@ -1920,6 +2220,7 @@
       librarySig = "";
       renderAll();
       if (hint) setText(document.getElementById("save-hint"), hint);
+      if (done) done(null);
     });
   }
 
@@ -1937,16 +2238,18 @@
       store.writeGround(ground, { live: true }, function (err) {
         if (err) {
           showBanner(err.message || "Could not save.");
+          if (opts && opts.onSaved) opts.onSaved(err);
           return;
         }
         showBanner("");
         actionSig = "";
         setText(document.getElementById("save-hint"), hint);
         renderAll();
+        if (opts && opts.onSaved) opts.onSaved(null);
       });
       return;
     }
-    saveDoc(hint);
+    saveDoc(hint, opts && opts.onSaved);
   }
 
   function tickerMessagesFromDoc() {
@@ -2063,6 +2366,22 @@
       return;
     }
     saveDoc(groundIds ? "Subscribe ticker will scroll once on this ground." : "Subscribe ticker will scroll once on every ground.");
+  }
+
+  function focusAds(id) {
+    var bar;
+    var buttons;
+    var i;
+    openGround(id);
+    bar = document.getElementById("action-bar");
+    if (bar && bar.scrollIntoView) bar.scrollIntoView();
+    buttons = bar ? bar.getElementsByTagName("button") : [];
+    for (i = 0; i < buttons.length; i++) {
+      if (buttons[i].getAttribute("data-action") && buttons[i].getAttribute("data-action") !== "logos") {
+        buttons[i].focus();
+        return;
+      }
+    }
   }
 
   function openGround(id) {
@@ -2694,6 +3013,18 @@
   if (document.getElementById("btn-reset-stuck")) {
     document.getElementById("btn-reset-stuck").onclick = function () { resetAllStuck(); };
   }
+  if (document.getElementById("btn-live-refresh")) {
+    document.getElementById("btn-live-refresh").onclick = function () {
+      if (window.PulsePlayCommand) window.PulsePlayCommand.refresh();
+    };
+  }
+  if (document.getElementById("score-switch-youtube-pick")) {
+    document.getElementById("score-switch-youtube-pick").onchange = function () {
+      if (this.value && document.getElementById("score-switch-youtube")) {
+        document.getElementById("score-switch-youtube").value = this.value;
+      }
+    };
+  }
   window.setInterval(function () {
     if (!currentDoc || !currentDoc.grounds) return;
     renderCenter();
@@ -3008,6 +3339,7 @@
   window.PulsePlayAdmin = {
     openGround: openGround,
     grounds: function () { return scopedGrounds(); },
+    focusAds: focusAds,
     noteStreams: function (rows) {
       window.PulsePlayAccessStreams = rows || [];
       centerSig = "";
