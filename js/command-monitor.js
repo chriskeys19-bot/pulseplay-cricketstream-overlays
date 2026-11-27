@@ -149,6 +149,24 @@
     while (node.firstChild) node.removeChild(node.firstChild);
   }
 
+  function clearOutline(card) {
+    if (!card || !card.classList) return;
+    if (card.classList.contains("card--break")) card.classList.remove("card--break");
+    if (card.classList.contains("card--drinks")) card.classList.remove("card--drinks");
+  }
+
+  function activeSlotFor(ground) {
+    var rules = window.PulsePlayGameSwitch;
+    if (!rules || !rules.scoreList || !rules.activeSlot) return null;
+    return rules.activeSlot(rules.scoreList(ground));
+  }
+
+  function scoreHint(ground) {
+    var clubs = window.PulsePlayCricClubs;
+    if (!clubs || !clubs.groundHint) return null;
+    return clubs.groundHint(ground, activeSlotFor(ground));
+  }
+
   function paintScores() {
     var list = grounds();
     var clubs = window.PulsePlayCricClubs;
@@ -160,6 +178,7 @@
     var line;
     var alert;
     var phase;
+    var copy;
     var button;
     for (i = 0; i < list.length; i++) {
       ground = list[i];
@@ -176,24 +195,26 @@
           alert.removeAttribute("data-phase");
           clearAlert(alert);
         }
-        if (card.classList.contains("card--break")) card.classList.remove("card--break");
+        clearOutline(card);
         continue;
       }
-      setText(line, view.score ? view.score + (view.detail && view.phase !== "soon" && view.phase !== "break" ? " · " + view.detail : "") : (view.detail || ""));
+      copy = clubs.alertPresentation ? clubs.alertPresentation(view.phase) : null;
+      setText(line, view.score ? view.score + (view.detail && !copy ? " · " + view.detail : "") : (view.detail || ""));
       phase = view.alert || "";
-      if (card.classList.contains("card--break")) card.classList.remove("card--break");
-      if (phase === "break") card.classList.add("card--break");
+      clearOutline(card);
+      copy = clubs.alertPresentation ? clubs.alertPresentation(phase) : null;
+      if (copy && copy.outline) card.classList.add("card--" + copy.outline);
       if (!alert) continue;
       if (alert.getAttribute("data-phase") === phase) continue;
       alert.setAttribute("data-phase", phase);
       clearAlert(alert);
-      if (!phase) {
+      if (!copy) {
         alert.className = "card__alert is-off";
         continue;
       }
-      alert.className = "card__alert card__alert--" + (phase === "break" ? "break" : "soon");
-      alert.appendChild(document.createTextNode(phase === "break" ? "INNINGS BREAK — Trigger Ads" : "Mid-Innings Break Coming Up"));
-      if (phase === "break") {
+      alert.className = "card__alert card__alert--" + copy.tone;
+      alert.appendChild(document.createTextNode(copy.text));
+      if (copy.jump) {
         button = document.createElement("button");
         button.type = "button";
         button.className = "card__ads";
@@ -284,11 +305,13 @@
     }
     if (!source) return Promise.resolve();
     if (source.kind === "sse") {
-      return fetchSse(source.code).then(function (view) {
+      return fetchSse(source.code, scoreHint(ground)).then(function (view) {
         if (view) lastScore[ground.id] = view;
       });
     }
-    return fetchRest(source.clubId, source.matchId).then(function (view) { if (view) lastScore[ground.id] = view; });
+    return fetchRest(source.clubId, source.matchId, scoreHint(ground)).then(function (view) {
+      if (view) lastScore[ground.id] = view;
+    });
   }
 
   function scoreEventReady(text) {
@@ -320,7 +343,7 @@
     return pump();
   }
 
-  function fetchSse(code) {
+  function fetchSse(code, hint) {
     var clubs = window.PulsePlayCricClubs;
     var ctrl = typeof AbortController === "function" ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
@@ -332,7 +355,7 @@
       return readUntil(response);
     }).then(function (text) {
       clearTimeout(timer);
-      return clubs.fromSse(clubs.parseSseScore(text));
+      return clubs.fromSse(clubs.parseSseScore(text), hint);
     }).catch(function () {
       clearTimeout(timer);
       return null;
@@ -343,7 +366,7 @@
     return promise;
   }
 
-  function fetchRest(clubId, matchId) {
+  function fetchRest(clubId, matchId, hint) {
     var clubs = window.PulsePlayCricClubs;
     var ctrl = typeof AbortController === "function" ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
@@ -355,7 +378,7 @@
       return response.json();
     }).then(function (body) {
       clearTimeout(timer);
-      return clubs.fromRest(body);
+      return clubs.fromRest(body, hint);
     }).catch(function () {
       clearTimeout(timer);
       return null;
@@ -479,11 +502,19 @@
 
   document.addEventListener("visibilitychange", sync);
 
+  function rememberScore(id, view) {
+    if (!id) return;
+    if (!view) delete lastScore[id];
+    else lastScore[id] = view;
+    paintScores();
+  }
+
   window.PulsePlayCommand = {
     sync: sync,
     refresh: refresh,
     paint: paint,
     loadBroadcasts: loadBroadcasts,
-    fillPick: fillPick
+    fillPick: fillPick,
+    rememberScore: rememberScore
   };
 })();
