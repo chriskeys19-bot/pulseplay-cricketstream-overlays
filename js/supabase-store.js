@@ -16,20 +16,51 @@
     var key = runtime.supabaseKey;
     var pollMs = runtime.pollMs || 2000;
 
+    /*
+     * PostgREST treats an unknown query param as a column filter.
+     * On this project, /rest/v1/pp_grounds?_=1730000000000 is HTTP 400
+     * PGRST100, and ?_=eq.1 is HTTP 400 42703 "column pp_grounds._ does
+     * not exist". A cache-busting `_=` (or ppbust) must not be added to
+     * /rest/v1/ URLs. GET/HEAD still bypass the WebView cache with
+     * cache:no-store plus Cache-Control and Pragma. Other GET/HEAD URLs
+     * can take `_=<timestamp>`.
+     */
+    function cacheBustUrl(url) {
+      var hash = "";
+      var baseUrl = String(url || "");
+      var cut = baseUrl.indexOf("#");
+      var stamp = String(new Date().getTime());
+      if (cut !== -1) {
+        hash = baseUrl.substring(cut);
+        baseUrl = baseUrl.substring(0, cut);
+      }
+      return baseUrl + (baseUrl.indexOf("?") === -1 ? "?" : "&") + "_=" + stamp + hash;
+    }
+
     function request(path, options, callback) {
       var opts = options || {};
       var headers = opts.headers || {};
+      var method = String(opts.method || "GET").toUpperCase();
       var url = path.indexOf("http") === 0 ? path : base + path;
       var body = opts.body;
       var token = opts.token || key;
+      var read = method === "GET" || method === "HEAD";
+      var init;
       headers.apikey = key;
       if (!headers.Authorization) headers.Authorization = "Bearer " + token;
+      if (read) {
+        headers["Cache-Control"] = "no-cache";
+        headers.Pragma = "no-cache";
+        if (url.indexOf("/rest/v1/") === -1) url = cacheBustUrl(url);
+      }
       if (global.fetch) {
-        global.fetch(url, {
-          method: opts.method || "GET",
+        init = {
+          method: method,
           headers: headers,
           body: body
-        }).then(function (response) {
+        };
+        if (read) init.cache = "no-store";
+        global.fetch(url, init).then(function (response) {
           response.text().then(function (text) {
             var parsed = null;
             if (text) {
@@ -47,7 +78,7 @@
         return;
       }
       var xhr = new XMLHttpRequest();
-      xhr.open(opts.method || "GET", url, true);
+      xhr.open(method, url, true);
       var name;
       for (name in headers) {
         if (headers.hasOwnProperty(name)) xhr.setRequestHeader(name, headers[name]);

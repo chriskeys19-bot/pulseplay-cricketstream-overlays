@@ -1,9 +1,14 @@
 /*
- * Point an iframe at a score_url, and if that host refuses to be framed
- * (or never paints), hide the frame and reveal the fallback link instead.
+ * Point an iframe at a score_url. When the URL changes, swap a fresh iframe
+ * into #score-slot immediately. YoloBox's WebView often never fires onload
+ * for a hidden offscreen frame, so this does not preload in a 1×1 ghost.
+ * data-current stays the canonical URL (no ppbust), and a short watchdog
+ * retries a load that never reports onload.
  */
 (function (global) {
   var store = global.PulsePlayStore;
+  var WATCH_MS = 4000;
+  var MAX_ATTEMPTS = 3;
 
   function show(node, on) {
     if (!node) return;
@@ -42,21 +47,150 @@
     if (frame.style.backgroundColor !== "transparent") frame.style.backgroundColor = "transparent";
   }
 
+  function stripPpbust(url) {
+    var hash = "";
+    var base = String(url || "");
+    var cut = base.indexOf("#");
+    if (cut !== -1) {
+      hash = base.substring(cut);
+      base = base.substring(0, cut);
+    }
+    base = base.replace(/([?&])ppbust=[^&]*&/g, "$1").replace(/([?&])ppbust=[^&]*$/g, "");
+    if (base.charAt(base.length - 1) === "?" || base.charAt(base.length - 1) === "&") {
+      base = base.substring(0, base.length - 1);
+    }
+    return base + hash;
+  }
+
+  function bustUrl(url) {
+    var canonical = stripPpbust(url);
+    var hash = "";
+    var base = canonical;
+    var cut = base.indexOf("#");
+    var stamp = new Date().getTime();
+    if (cut !== -1) {
+      hash = base.substring(cut);
+      base = base.substring(0, cut);
+    }
+    return base + (base.indexOf("?") === -1 ? "?" : "&") + "ppbust=" + stamp + hash;
+  }
+
+  function childList(node) {
+    var kids = node.children || node.childNodes;
+    var list = [];
+    var i;
+    if (!kids) return list;
+    for (i = 0; i < kids.length; i++) list.push(kids[i]);
+    return list;
+  }
+
+  function isGhostFrame(node) {
+    var css;
+    var left;
+    var id;
+    if (!node || String(node.tagName || node.nodeName || "").toUpperCase() !== "IFRAME") return false;
+    id = node.id || (node.getAttribute && node.getAttribute("id")) || "";
+    if (id === "score-frame") return false;
+    if (node.getAttribute && node.getAttribute("aria-hidden") === "true") return true;
+    css = node.style && node.style.cssText ? String(node.style.cssText) : "";
+    if (css.indexOf("-9999px") !== -1) return true;
+    left = node.style && node.style.left ? String(node.style.left) : "";
+    if (left.indexOf("-9999") !== -1) return true;
+    return false;
+  }
+
+  function clearGhosts() {
+    var root = document.body || document.documentElement;
+    if (!root) return;
+    walk(root);
+    function walk(node) {
+      var list = childList(node);
+      var i;
+      var child;
+      for (i = 0; i < list.length; i++) {
+        child = list[i];
+        if (isGhostFrame(child)) {
+          child.onload = null;
+          child.onerror = null;
+          if (child.parentNode) child.parentNode.removeChild(child);
+        } else if (child) {
+          walk(child);
+        }
+      }
+    }
+  }
+
+  function clearWatch(frame) {
+    if (!frame || !frame._ppWatch) return;
+    if (global.clearTimeout) global.clearTimeout(frame._ppWatch);
+    frame._ppWatch = null;
+  }
+
+  function pendingStale(frame) {
+    var at = parseInt(frame.getAttribute("data-pending-at") || "0", 10);
+    if (!at) return true;
+    return new Date().getTime() - at >= WATCH_MS;
+  }
+
+  function copyLook(from, to) {
+    var css;
+    to.id = from.id || "score-frame";
+    if (from.className) to.className = from.className;
+    css = from.style && from.style.cssText;
+    if (css && to.style) to.style.cssText = css;
+    decorate(to);
+    if (to.classList) to.classList.remove("is-off");
+  }
+
+  function mountFrame(iframe, fresh) {
+    var parent = iframe.parentNode || document.getElementById("score-slot");
+    if (!parent) return false;
+    clearWatch(iframe);
+    if (iframe.parentNode === parent) parent.replaceChild(fresh, iframe);
+    else {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      parent.appendChild(fresh);
+    }
+    return true;
+  }
+
+  function armWatch(frame, token, opts) {
+    clearWatch(frame);
+    if (!global.setTimeout) return;
+    frame._ppWatch = global.setTimeout(function () {
+      var live = document.getElementById(frame.id);
+      frame._ppWatch = null;
+      if (!live || live !== frame) return;
+      if ((live.getAttribute("data-current") || "") === token) return;
+      if ((live.getAttribute("data-pending") || "") !== token) return;
+      live.setAttribute("data-pending-at", "0");
+      attach({
+        iframe: live,
+        fallback: opts.fallback,
+        link: opts.link,
+        url: opts.url,
+        linkLabel: opts.linkLabel
+      });
+    }, WATCH_MS);
+  }
+
   function attach(opts) {
-    var iframe = opts.iframe;
-    var fallback = opts.fallback;
-    var link = opts.link;
-    var url = opts.url;
-    var linkLabel = opts.linkLabel || "Open score";
+    var iframe = opts && opts.iframe;
+    var fallback = opts && opts.fallback;
+    var link = opts && opts.link;
+    var url = opts && opts.url;
+    var linkLabel = (opts && opts.linkLabel) || "Open score";
     var safe = iframe ? store.safeUrl(url) : "";
-    var key = safe || "";
+    var key = stripPpbust(safe || "");
     var blocked = !safe || store.hostBlocksEmbed(url);
     var token = blocked ? "blocked" : key;
-    var ghost;
+    var pending;
+    var attempts;
+    var fresh;
 
+    clearGhosts();
     if (!iframe) return;
     if ((iframe.getAttribute("data-current") || "") === token) return;
-    if ((iframe.getAttribute("data-pending") || "") === token) return;
 
     if (link && link.getAttribute("href") !== (safe || "#")) {
       link.href = safe || "#";
@@ -66,51 +200,49 @@
     }
 
     if (blocked) {
+      clearWatch(iframe);
       iframe.setAttribute("data-current", "blocked");
       iframe.removeAttribute("data-pending");
+      iframe.removeAttribute("data-pending-at");
       if (iframe.getAttribute("src") && iframe.getAttribute("src") !== "about:blank") iframe.src = "about:blank";
       show(iframe, false);
       show(fallback, true);
       return;
     }
 
-    iframe.setAttribute("data-pending", token);
-    ghost = document.createElement("iframe");
-    ghost.setAttribute("aria-hidden", "true");
-    ghost.style.cssText = "position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;opacity:0;";
-    ghost.onload = function () {
-      var live;
-      ghost.onload = null;
-      ghost.onerror = null;
-      live = document.getElementById(iframe.id) || iframe;
-      if (!live.parentNode || live.getAttribute("data-pending") !== token) {
-        if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-        return;
-      }
-      ghost.id = live.id;
-      ghost.removeAttribute("aria-hidden");
-      ghost.removeAttribute("style");
-      decorate(ghost);
-      ghost.setAttribute("data-current", token);
-      ghost.removeAttribute("data-pending");
-      live.parentNode.replaceChild(ghost, live);
-      show(ghost, true);
+    pending = iframe.getAttribute("data-pending") || "";
+    attempts = parseInt(iframe.getAttribute("data-score-attempts") || "0", 10);
+    if (!attempts || attempts < 0) attempts = 0;
+    if (pending === token) {
+      if (attempts >= MAX_ATTEMPTS) return;
+      if (!pendingStale(iframe)) return;
+    } else {
+      attempts = 0;
+    }
+    attempts += 1;
+
+    fresh = document.createElement("iframe");
+    copyLook(iframe, fresh);
+    fresh.setAttribute("data-pending", token);
+    fresh.setAttribute("data-pending-at", String(new Date().getTime()));
+    fresh.setAttribute("data-score-attempts", String(attempts));
+    fresh.onload = function () {
+      fresh.onload = null;
+      fresh.onerror = null;
+      if (!fresh.parentNode) return;
+      if (document.getElementById(fresh.id) !== fresh) return;
+      if ((fresh.getAttribute("data-pending") || "") !== token) return;
+      fresh.setAttribute("data-current", token);
+      fresh.removeAttribute("data-pending");
+      fresh.removeAttribute("data-pending-at");
+      fresh.removeAttribute("data-score-attempts");
+      clearWatch(fresh);
+      show(fresh, true);
       show(fallback, false);
     };
-    ghost.onerror = function () {
-      var live;
-      if (ghost.id === "score-frame") return;
-      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-      live = document.getElementById(iframe.id);
-      if (!live || (live.getAttribute("data-pending") || "") !== token) return;
-      live.setAttribute("data-current", token);
-      live.removeAttribute("data-pending");
-      if (live.getAttribute("src") !== safe) live.src = safe;
-      show(live, true);
-      show(fallback, false);
-    };
-    document.body.appendChild(ghost);
-    ghost.src = safe;
+    if (!mountFrame(iframe, fresh)) return;
+    fresh.src = bustUrl(key);
+    if (attempts < MAX_ATTEMPTS) armWatch(fresh, token, opts);
   }
 
   function hostOf(url) {
@@ -178,5 +310,11 @@
     return { width: FULL_VIEW.width, height: FULL_VIEW.height };
   }
 
-  global.PulsePlayScore = { attach: attach, frameScale: frameScale, frameViewport: frameViewport };
+  global.PulsePlayScore = {
+    attach: attach,
+    frameScale: frameScale,
+    frameViewport: frameViewport,
+    WATCH_MS: WATCH_MS,
+    MAX_ATTEMPTS: MAX_ATTEMPTS
+  };
 })(window);

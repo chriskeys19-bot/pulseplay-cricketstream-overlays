@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <script src="../js/overlay-target.js"></script>
+  <script src="../js/overlay-target.js?v=20261126"></script>
   <script>
     (function () {
       if (!window.PulsePlayDevice || !window.PulsePlayDevice.proNeedsNormalize(location.search)) return;
@@ -12,15 +12,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>YoloBox Pro overlay</title>
   <style>html,body{background:transparent;margin:0;height:100%;overflow:hidden}</style>
-  <link rel="stylesheet" href="overlay.css">
-  <link rel="stylesheet" href="pro.css">
+  <link rel="stylesheet" href="overlay.css?v=20261126">
+  <link rel="stylesheet" href="pro.css?v=20261126">
 </head>
 <body class="mode-logos-score" data-device="pro">
   <!--
     View 1 (#view-logos) and View 2 (#view-ad) both stay in the DOM.
     The script only toggles body classes mode-logos-score and mode-ad,
     and .is-active on the preloaded video for the ground's selected ad.
-    It does not remove #score-frame, so the CricClubs overlay is not reloaded.
+    #score-frame is replaced only when the canonical score URL changes.
   -->
   <div id="stage" data-w="1920" data-h="1080">
     <div id="view-logos" class="view">
@@ -44,12 +44,12 @@
     </div>
     <p id="overlay-status" class="is-off"><span id="overlay-status-text"></span></p>
   </div>
-  <script src="../config/runtime.js"></script>
-  <script src="../js/storage.js"></script>
-  <script src="../js/supabase-store.js"></script>
-  <script src="../js/score-frame.js"></script>
-  <script src="../js/layout.js"></script>
-  <script src="../js/psd-grounds.js"></script>
-  <script src="overlay.js"></script>
+  <script src="../config/runtime.js?v=20261126"></script>
+  <script src="../js/storage.js?v=20261126"></script>
+  <script src="../js/supabase-store.js?v=20261126"></script>
+  <script src="../js/score-frame.js?v=20261126"></script>
+  <script src="../js/layout.js?v=20261126"></script>
+  <script src="../js/psd-grounds.js?v=20261126"></script>
+  <script src="overlay.js?v=20261126"></script>
 </body>
 </html>
