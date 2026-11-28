@@ -174,6 +174,7 @@
     canonicalDivision: canonicalDivision,
     covers: covers,
     streamVisible: streamVisible,
+    groundMatches: groundMatches,
     groundVisible: groundVisible,
     canManage: canManage,
     label: label,
