@@ -1391,10 +1391,12 @@
           : "No grounds yet. Add the first one in Ground setup. Overlay pages stay transparent until a ground exists.");
         grid.appendChild(emptyNote);
         paintStuckHint();
+        paintDayBoard();
         return;
       }
       for (i = 0; i < grounds.length; i++) grid.appendChild(buildCard(grounds[i]));
       paintStuckHint();
+      paintDayBoard();
       return;
     }
     for (i = 0; i < grounds.length; i++) {
@@ -1408,6 +1410,11 @@
       if (card) paintCard(card, ground);
     }
     paintStuckHint();
+    paintDayBoard();
+  }
+
+  function paintDayBoard() {
+    if (window.PulsePlayDayBoard && window.PulsePlayDayBoard.paint) window.PulsePlayDayBoard.paint();
   }
 
   function groundIds() {

@@ -143,6 +143,7 @@
         else detail.classList.add("is-off");
       }
     }
+    if (window.PulsePlayDayBoard && window.PulsePlayDayBoard.onHealth) window.PulsePlayDayBoard.onHealth(lastHealth);
   }
 
   function clearAlert(node) {
@@ -235,14 +236,22 @@
     paintScores();
   }
 
+  function pushId(ids, seen, id) {
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    ids.push(id);
+  }
+
   function pollHealth() {
     var ids = [];
     var seen = {};
     var list;
+    var extra;
     var i;
     var id;
     var now;
     if (!centerOpen()) return;
+    if (window.PulsePlayDayBoard && window.PulsePlayDayBoard.refreshStreams) window.PulsePlayDayBoard.refreshStreams();
     now = Date.now();
     if (now < healthBackoffUntil) return;
     if (healthBusy) {
@@ -250,12 +259,9 @@
       return;
     }
     list = grounds();
-    for (i = 0; i < list.length; i++) {
-      id = broadcastIdFor(list[i]);
-      if (!id || seen[id]) continue;
-      seen[id] = true;
-      ids.push(id);
-    }
+    for (i = 0; i < list.length; i++) pushId(ids, seen, broadcastIdFor(list[i]));
+    extra = window.PulsePlayDayBoard && window.PulsePlayDayBoard.broadcastIds ? window.PulsePlayDayBoard.broadcastIds() : [];
+    for (i = 0; i < extra.length; i++) pushId(ids, seen, extra[i]);
     if (!ids.length) {
       paintHealth();
       return;
